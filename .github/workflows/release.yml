@@ -1,0 +1,91 @@
+# Builds the Windows installers and opens a GitHub release when a version tag
+# is pushed:
+#
+#   npm run version:set -- 0.16.0     # then write the CHANGELOG entry
+#   git commit -am "Fishe 0.16.0"
+#   git tag v0.16.0 && git push && git push --tags
+#
+# The release is created as a draft with the installers attached and the
+# changelog entry as its notes: look it over, then press Publish. Set
+# `releaseDraft: false` below to publish without that step.
+#
+# The installers are not code-signed (see docs/development.md, Releases).
+#
+# This job can write to the repository's releases, so it takes nothing on
+# trust: actions are pinned to a commit (see ci.yml), the Npcap SDK is
+# checked against known hashes, dependencies come from Cargo.lock and
+# package-lock.json exactly as committed, and no build cache is restored.
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
+
+      # The tag is the release: it must name the version the files carry,
+      # and that version must have its changelog entry.
+      - name: Version and notes
+        id: meta
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "tag $env:GITHUB_REF_NAME does not match the version in package.json ($version); run npm run version:set"
+          }
+          $cargo = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          if ($cargo -ne $version) { throw "Cargo.toml is at $cargo, package.json at $version" }
+          node scripts/release-notes.mjs $version | Out-File -Encoding utf8 release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw "no changelog entry for $version" }
+          "version=$version" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
+      # Build-time import libraries for the pcap crate. Npcap itself is not
+      # shipped: users install it (the app tells them how).
+      - name: Npcap SDK
+        run: ./scripts/setup-npcap-sdk.ps1
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # The same checks as CI: a tag never releases what would not pass.
+      - name: Checks
+        run: |
+          npm run check
+          npm test
+          cargo test --workspace --locked
+
+      - name: Release notes
+        id: notes
+        run: |
+          $delimiter = "NOTES_$([guid]::NewGuid().ToString('N'))"
+          "body<<$delimiter" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+          Get-Content release-notes.md | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+          $delimiter | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
+      # Builds the frontend and the app in release mode, bundles the NSIS
+      # and MSI installers, and attaches them to the release for this tag.
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Fishe ${{ steps.meta.outputs.version }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: true
+          prerelease: false

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Source for `npm run tauri icon src-tauri/icons/fishe.svg` -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2026"/>
+      <stop offset="1" stop-color="#0b0d0f"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3ab3e6"/>
+      <stop offset="1" stop-color="#0f6f9a"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#bg)"/>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="none" stroke="#34404a" stroke-width="12"/>
+  <g transform="translate(112 112) scale(12.5)">
+    <path d="M4 32 C12 17 26 13 38 15 C44 16 48 21 50 25 L61 17 L58 32 L61 47 L50 39 C48 43 44 48 38 49 C26 51 12 47 4 32 Z" fill="url(#body)"/>
+    <circle cx="15" cy="29" r="3" fill="#0b0d0f"/>
+    <path d="M24 40 A11 11 0 0 1 44 36" fill="none" stroke="#0b0d0f" stroke-width="3" stroke-linecap="round"/>
+    <path d="M33 40 L40 30" stroke="#0b0d0f" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

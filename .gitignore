@@ -1,0 +1,33 @@
+# ── JavaScript / SvelteKit ──
+node_modules
+/build
+/.svelte-kit
+/package
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# ── Environment ──
+.env
+.env.*
+!.env.example
+
+# ── Npcap SDK (build-time only, fetched by scripts/setup-npcap-sdk.ps1) ──
+/vendor/
+
+# ── Editors / tools ──
+/.idea/
+*.iml
+.DS_Store
+Thumbs.db
+/.claude/settings.local.json
+
+# ── Logs and local output ──
+*.log
+*.pcap
+*.pcapng
+
+# MCP client config (holds the Fishe agent token)
+.mcp.json
+
+# Written by the release workflow.
+/release-notes.md

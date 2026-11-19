@@ -1,0 +1,30 @@
+[package]
+name = "fishe"
+description = "Fishe - real-time traffic gauge for a remote host or a local process"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# The desktop app: the window, the IPC commands and the generated TypeScript
+# bindings. Everything it shows comes from `fishe-core`.
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "fishe_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+fishe-core = { path = "../crates/fishe-core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+log = "0.4"
+specta = { version = "=2.0.0-rc.26", features = ["derive"] }
+specta-typescript = "0.0.13"
+tauri-specta = { version = "2.0.0-rc.26", features = ["derive", "typescript"] }

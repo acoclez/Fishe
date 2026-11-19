@@ -1,0 +1,174 @@
+/*
+ * Fishe theme: sea blue on black/gray. Dark only by design.
+ * All colours are tokens; components reference roles, never raw hex.
+ * Series colours were validated for colour-vision deficiency and contrast
+ * against --surface-1 (see docs/frontend.md § Colour).
+ */
+:root {
+  color-scheme: dark;
+
+  /* surfaces, darkest → lightest */
+  --bg: #0b0d0f;
+  --surface-1: #14181c;
+  --surface-2: #1b2026;
+  --surface-3: #232a31;
+  --border: #262d34;
+  --border-strong: #34404a;
+
+  /* text */
+  --text-primary: #e8edf1;
+  --text-secondary: #a3adb7;
+  --text-muted: #6c7781;
+
+  /* brand: sea blue */
+  --accent: #1f9bd1;
+  --accent-strong: #3ab3e6;
+  --accent-deep: #0f6f9a;
+  --accent-wash: rgba(31, 155, 209, 0.14);
+  --accent-glow: rgba(31, 155, 209, 0.35);
+
+  /* data series */
+  --series-in: #1f9bd1;
+  --series-out: #d95926;
+  /* Round-trip time (connection quality chart). */
+  --series-rtt: #4fd1a5;
+
+  /* busyness levels (always paired with icon + label) */
+  --level-idle: #6c7781;
+  --level-calm: #1f9bd1;
+  --level-busy: #fab219;
+  --level-spike: #d03b3b;
+
+  --danger: #e05252;
+  --danger-wash: rgba(224, 82, 82, 0.12);
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+
+  font-family: var(--font-ui), sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.card-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Shared bits every panel uses; components add sizes, never colours. */
+.muted {
+  color: var(--text-muted);
+}
+
+.err {
+  color: var(--danger);
+}
+
+/* Segmented control: a row of buttons, one "on". Components set padding
+   and radii (two sizes exist); colours are the same everywhere. */
+.seg {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+}
+.seg button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.seg button.on {
+  background: var(--accent);
+  color: #04121a;
+  font-weight: 600;
+}
+
+/* Inline spinner; takes the text colour. Components set its size. */
+.spin {
+  display: inline-block;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -1px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+::selection {
+  background: var(--accent-glow);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 6px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

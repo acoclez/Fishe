@@ -1,0 +1,18 @@
+# Normalise text to LF in the repository; check out with native endings
+# except where Windows tools need CRLF.
+* text=auto eol=lf
+
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets
+*.png  binary
+*.ico  binary
+*.icns binary
+*.mmdb binary
+*.db   binary
+
+# Lockfiles: keep diffs readable but don't try to merge them
+package-lock.json -diff merge=binary
+src-tauri/Cargo.lock -diff merge=binary

@@ -1,0 +1,15 @@
+# At the repo root so Cargo finds it from any folder: `src-tauri/` (tauri
+# dev/build, IDEs) and the root (`npm run test:rust`, which uses
+# --manifest-path). Cargo reads config from the current folder upwards.
+#
+# Points the `pcap` crate's build script at the Npcap SDK import libraries
+# (wpcap.lib / Packet.lib). The SDK is not committed: run
+# `scripts/setup-npcap-sdk.ps1` from the repo root to download it into vendor/.
+# Override by setting LIBPCAP_LIBDIR in your environment.
+[env]
+LIBPCAP_LIBDIR = { value = "vendor/npcap-sdk/Lib/x64", relative = true, force = false }
+
+# The workspace root is the repository root, but the build output stays in
+# src-tauri/target, where Tauri and the ignore files expect it.
+[build]
+target-dir = "src-tauri/target"

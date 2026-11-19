@@ -1,0 +1,98 @@
+# Runs on every push / pull request once this folder is a GitHub repository.
+# Two jobs: the whole workspace on Windows (the app is Windows-only), and the
+# core crate on Linux, which has no window in it and must keep building there.
+#
+# Actions are pinned to a commit (the comment names the version): a tag can
+# be moved to other code, a commit cannot. To update one, take the commit
+# behind the new tag: `git ls-remote https://github.com/<owner>/<action>`.
+# `--locked` makes cargo use Cargo.lock exactly as committed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
+        with:
+          components: clippy, rustfmt
+
+      # The workspace root is the repository root; .cargo/config.toml keeps
+      # the build output in src-tauri/target.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: ". -> src-tauri/target"
+
+      # Build-time import libraries for the pcap crate (no Npcap driver needed:
+      # wpcap.dll is delay-loaded, and unit tests never call into it).
+      - name: Npcap SDK
+        run: ./scripts/setup-npcap-sdk.ps1
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Svelte / TypeScript check
+        run: npm run check
+
+      - name: Frontend unit tests
+        run: npm test
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: rustfmt
+        run: cargo fmt --all --check
+
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --workspace --locked
+
+      # The real app binary (frontend embedded, no installer): catches what
+      # `cargo test` can't, like a broken tauri.conf.json or a release-only
+      # compile error. The debug profile reuses the test build's artifacts.
+      - name: App build
+        run: npm run tauri build -- --debug --no-bundle
+
+  # fishe-core on Linux with libpcap. Parts that only exist on Windows
+  # (ETW, ICMP probes, the LAN scan) compile to stubs there;
+  # this keeps the rest honest. Locally: scripts/linux-check.ps1.
+  core-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: ". -> src-tauri/target"
+
+      - name: libpcap
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpcap-dev
+
+      - name: clippy
+        run: cargo clippy -p fishe-core --all-targets --locked -- -D warnings
+
+      - name: Unit tests
+        run: cargo test -p fishe-core --locked
