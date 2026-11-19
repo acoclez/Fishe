@@ -1,10 +1,11 @@
-# Runs on every push / pull request once this folder is a GitHub repository.
+# Runs on every push to main and on every pull request.
 # Two jobs: the whole workspace on Windows (the app is Windows-only), and the
 # core crate on Linux, which has no window in it and must keep building there.
 #
 # Actions are pinned to a commit (the comment names the version): a tag can
-# be moved to other code, a commit cannot. To update one, take the commit
-# behind the new tag: `git ls-remote https://github.com/<owner>/<action>`.
+# be moved to other code, a commit cannot. Dependabot proposes the updates
+# (.github/dependabot.yml). By hand, take the commit behind the new tag:
+# `git ls-remote https://github.com/<owner>/<action>`.
 # `--locked` makes cargo use Cargo.lock exactly as committed.
 name: CI
 

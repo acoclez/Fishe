@@ -1,0 +1,22 @@
+# Keeps the actions in .github/workflows up to date. They are pinned to a
+# commit, so nothing moves by itself: once a month Dependabot opens one pull
+# request that replaces the hashes (and the version comments) of the actions
+# that have a newer release. CI runs on it like on any pull request.
+#
+# Cargo and npm dependencies are not listed: they change only when the lock
+# files are updated by hand. Dependabot alerts, a repository setting, report
+# the ones with a known vulnerability.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      # Pinned to a commit of its `stable` branch, not to a release: there
+      # is no newer version to propose. Updated by hand (see
+      # docs/development.md, Releases).
+      - dependency-name: dtolnay/rust-toolchain

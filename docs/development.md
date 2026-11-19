@@ -264,8 +264,11 @@ changelog has no entry for the new version.
 
 The release job can write to the repository's releases, so it takes
 nothing on trust. Actions in both workflows are pinned to a commit, with
-the version in a comment: to update one, replace the hash with the commit
-behind the new tag (`git ls-remote https://github.com/<owner>/<action>`).
+the version in a comment. Dependabot opens a pull request once a month
+with the newer hashes (`.github/dependabot.yml`); `dtolnay/rust-toolchain`
+follows a branch instead of version tags and is updated by hand: replace
+the hash with the commit at the head of its `stable` branch
+(`git ls-remote https://github.com/dtolnay/rust-toolchain stable`).
 `scripts/setup-npcap-sdk.ps1` checks the SDK's import libraries, which end
 up inside the binary, against SHA-256 hashes kept in the script; a new SDK
 version needs its hashes added there. The release job restores no build
