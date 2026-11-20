@@ -7,8 +7,8 @@
    * baseline, and a strip under the axis records the busyness level over
    * time, which is the "when did it get busier" view. Hover for exact values.
    */
-  import type { TrafficPoint, Units } from "$lib/api/types";
-  import { formatRatio, niceCeil, rateText, shortSi, toUnits } from "$lib/utils/format";
+  import type { TrafficPoint, Units } from "#lib/api/types.ts";
+  import { formatRatio, niceCeil, rateText, shortSi, toUnits } from "#lib/utils/format.ts";
   import LevelBadge from "./LevelBadge.svelte";
 
   interface Props {

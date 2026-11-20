@@ -10,10 +10,10 @@
    */
   import { untrack } from "svelte";
   import { flip } from "svelte/animate";
-  import type { TrafficPoint, ProgramRow, Units } from "$lib/api/types";
-  import { StableList } from "$lib/stores/stable.svelte";
-  import { formatBytes, rateText } from "$lib/utils/format";
-  import { monitor } from "$lib/stores/monitor.svelte";
+  import type { TrafficPoint, ProgramRow, Units } from "#lib/api/types.ts";
+  import { StableList } from "#lib/stores/stable.svelte.ts";
+  import { formatBytes, rateText } from "#lib/utils/format.ts";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
   import LevelBadge from "../../components/LevelBadge.svelte";
   import Sparkline from "../../components/Sparkline.svelte";
 

@@ -1,14 +1,14 @@
 <script lang="ts">
   /** Replay of one recording: summary, full-length chart, notable moments, endpoints. */
-  import { api, errorMessage } from "$lib/api";
-  import { formatBytes, formatCount, formatDuration, formatRatio, rateText } from "$lib/utils/format";
-  import type { Episode, RecordingDetail, SeriesPoint, Units } from "$lib/api/types";
+  import { api, errorMessage } from "#lib/api/index.ts";
+  import { formatBytes, formatCount, formatDuration, formatRatio, rateText } from "#lib/utils/format.ts";
+  import type { Episode, RecordingDetail, SeriesPoint, Units } from "#lib/api/types.ts";
   import TrafficChart from "../../components/TrafficChart.svelte";
   import LevelBadge from "../../components/LevelBadge.svelte";
   import StatTile from "../../components/StatTile.svelte";
   import ArchiveEndpoints from "./ArchiveEndpoints.svelte";
   import QualityChart from "../../components/QualityChart.svelte";
-  import { GRADE_COLOR, jitterGrade, lossGrade, msText, pctText, rttGrade } from "$lib/utils/quality";
+  import { GRADE_COLOR, jitterGrade, lossGrade, msText, pctText, rttGrade } from "#lib/utils/quality.ts";
 
   let { id, units, onback }: { id: number; units: Units; onback: () => void } = $props();
 

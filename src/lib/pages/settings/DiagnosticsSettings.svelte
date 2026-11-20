@@ -4,7 +4,7 @@
    * folder. The file is what a bug report should come with.
    */
   import { onMount } from "svelte";
-  import { api, errorMessage } from "$lib/api";
+  import { api, errorMessage } from "#lib/api/index.ts";
 
   let location = $state("");
   let error = $state<string | null>(null);

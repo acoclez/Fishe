@@ -4,9 +4,9 @@
    * time, jitter and retransmissions measured passively, plus an optional
    * continuous ping (ICMP, started by the user) for traffic TCP can't time.
    */
-  import type { TrafficPoint } from "$lib/api/types";
-  import { pings } from "$lib/stores/pings.svelte";
-  import { GRADE_COLOR, jitterGrade, lossGrade, msText, pctText, rttGrade } from "$lib/utils/quality";
+  import type { TrafficPoint } from "#lib/api/types.ts";
+  import { pings } from "#lib/stores/pings.svelte.ts";
+  import { GRADE_COLOR, jitterGrade, lossGrade, msText, pctText, rttGrade } from "#lib/utils/quality.ts";
   import QualityChart from "../../components/QualityChart.svelte";
 
   interface Props {

@@ -3,7 +3,7 @@
    * Side rail: one button per page, settings at the bottom. Fixed width; the
    * active marker moves with a transform, so nothing reflows.
    */
-  import { PAGES, nav, type Page } from "$lib/stores/nav.svelte";
+  import { PAGES, nav, type Page } from "#lib/stores/nav.svelte.ts";
   import Logo from "./Logo.svelte";
 
   let { live = false, recording = false }: { live?: boolean; recording?: boolean } = $props();

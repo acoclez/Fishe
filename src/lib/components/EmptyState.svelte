@@ -1,7 +1,7 @@
 <script lang="ts">
   /** Connections and Map without a program / all-traffic session: say why, offer Live. */
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { nav } from "$lib/stores/nav.svelte";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { nav } from "#lib/stores/nav.svelte.ts";
 
   let { what }: { what: string } = $props();
 </script>

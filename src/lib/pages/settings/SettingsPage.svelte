@@ -4,8 +4,8 @@
    * `nav.section` (from the Agents chip, or any deep link) scrolls to one.
    */
   import { tick } from "svelte";
-  import { PRESETS, WINDOWS, settings } from "$lib/stores/settings.svelte";
-  import { SETTINGS_SECTIONS, nav, type SettingsSection } from "$lib/stores/nav.svelte";
+  import { PRESETS, WINDOWS, settings } from "#lib/stores/settings.svelte.ts";
+  import { SETTINGS_SECTIONS, nav, type SettingsSection } from "#lib/stores/nav.svelte.ts";
   import GeoSettings from "./GeoSettings.svelte";
   import AgentsSettings from "./AgentsSettings.svelte";
   import DiagnosticsSettings from "./DiagnosticsSettings.svelte";

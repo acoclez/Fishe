@@ -1,7 +1,7 @@
 <script lang="ts">
   /** Transient notices (error, warnings, "recording saved") float above the page instead of pushing it down. */
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { session } from "$lib/stores/session.svelte";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
 </script>
 
 <div class="toasts" aria-live="polite">

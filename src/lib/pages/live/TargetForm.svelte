@@ -1,9 +1,9 @@
 <script lang="ts">
   /** Mode switch (Host | Process | All), target input, interface picker, Start/Stop. */
-  import type { InterfaceInfo, Mode, ProcessSelector, RecordingTick, TargetSpec } from "$lib/api/types";
-  import { formatDuration } from "$lib/utils/format";
-  import type { Phase } from "$lib/stores/monitor.svelte";
-  import { settings } from "$lib/stores/settings.svelte";
+  import type { InterfaceInfo, Mode, ProcessSelector, RecordingTick, TargetSpec } from "#lib/api/types.ts";
+  import { formatDuration } from "#lib/utils/format.ts";
+  import type { Phase } from "#lib/stores/monitor.svelte.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
   import ProcessPicker from "./ProcessPicker.svelte";
 
   interface Props {

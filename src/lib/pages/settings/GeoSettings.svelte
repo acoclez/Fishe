@@ -1,10 +1,10 @@
 <script lang="ts">
   /** Settings: offline owner database (DB-IP Lite) and opt-in online lookup. */
   import { onMount } from "svelte";
-  import { api, errorMessage } from "$lib/api";
-  import { formatBytes } from "$lib/utils/format";
-  import { settings } from "$lib/stores/settings.svelte";
-  import type { GeoProgress, GeoStatus } from "$lib/api/types";
+  import { api, errorMessage } from "#lib/api/index.ts";
+  import { formatBytes } from "#lib/utils/format.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
+  import type { GeoProgress, GeoStatus } from "#lib/api/types.ts";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
 
   let status = $state<GeoStatus | null>(null);

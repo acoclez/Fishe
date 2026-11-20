@@ -5,9 +5,9 @@
    * rows, empty ones kept), order held like the big tables (StableList).
    */
   import { flip } from "svelte/animate";
-  import { StableList } from "$lib/stores/stable.svelte";
-  import { formatRate } from "$lib/utils/format";
-  import type { TopItem, Units } from "$lib/api/types";
+  import { StableList } from "#lib/stores/stable.svelte.ts";
+  import { formatRate } from "#lib/utils/format.ts";
+  import type { TopItem, Units } from "#lib/api/types.ts";
 
   let {
     title,

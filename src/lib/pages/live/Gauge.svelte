@@ -9,8 +9,8 @@
    * - A notch marks the baseline ("normal") itself.
    */
   import { Spring } from "svelte/motion";
-  import type { GaugeConfig, Level, Units } from "$lib/api/types";
-  import { formatRate, formatRatio, shortSi, toUnits } from "$lib/utils/format";
+  import type { GaugeConfig, Level, Units } from "#lib/api/types.ts";
+  import { formatRate, formatRatio, shortSi, toUnits } from "#lib/utils/format.ts";
   import LevelBadge from "../../components/LevelBadge.svelte";
 
   interface Props {

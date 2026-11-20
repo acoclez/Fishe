@@ -1,13 +1,13 @@
 <script lang="ts">
   /** Connections: programs (all-traffic mode), then the endpoints table or the packet list. */
-  import EmptyState from "$lib/components/EmptyState.svelte";
-  import EndpointsPanel from "$lib/pages/connections/EndpointsPanel.svelte";
-  import FocusBar from "$lib/components/FocusBar.svelte";
-  import PacketList from "$lib/pages/connections/PacketList.svelte";
-  import ProgramsPanel from "$lib/pages/connections/ProgramsPanel.svelte";
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { session } from "$lib/stores/session.svelte";
-  import { settings } from "$lib/stores/settings.svelte";
+  import EmptyState from "#lib/components/EmptyState.svelte";
+  import EndpointsPanel from "#lib/pages/connections/EndpointsPanel.svelte";
+  import FocusBar from "#lib/components/FocusBar.svelte";
+  import PacketList from "#lib/pages/connections/PacketList.svelte";
+  import ProgramsPanel from "#lib/pages/connections/ProgramsPanel.svelte";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
 
   const s = $derived(monitor.latest);
 </script>

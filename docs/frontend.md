@@ -1,6 +1,6 @@
 # Frontend
 
-SvelteKit in SPA mode (`adapter-static`, `ssr = false`) with **Svelte 5 runes**,
+SvelteKit 3 in SPA mode (`adapter-static`, `ssr = false`) with **Svelte 5 runes**,
 TypeScript and no UI framework. Charts and the gauge are hand-written SVG.
 
 ## Structure
@@ -84,6 +84,11 @@ src/
 A component lives in `pages/<page>/` while one page uses it and moves to
 `components/` when a second one does. Stores never import from pages or
 components; `utils/` imports nothing but types.
+
+Imports across folders are written from `src/lib` with the file extension,
+`#lib/stores/monitor.svelte.ts`; `#lib/*` is a subpath import declared in
+`package.json`, so the editor, Vite and Vitest resolve it without an alias.
+SvelteKit is configured in `vite.config.js` (there is no `svelte.config.js`).
 
 ## State
 

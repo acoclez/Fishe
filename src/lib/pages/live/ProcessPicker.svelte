@@ -6,9 +6,9 @@
    * refreshed while open). Picking a group binds by name: all instances,
    * including future ones. Expanding a group lets you bind to one PID.
    */
-  import { api, errorMessage } from "$lib/api";
-  import { settings } from "$lib/stores/settings.svelte";
-  import type { ProcessGroup, ProcessSelector } from "$lib/api/types";
+  import { api, errorMessage } from "#lib/api/index.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
+  import type { ProcessGroup, ProcessSelector } from "#lib/api/types.ts";
 
   interface Props {
     selection: ProcessSelector | null;

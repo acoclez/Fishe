@@ -348,6 +348,7 @@ interface GaugeConfig { busyRatio; spikeRatio; idleFloorBps; baselineFloorBps;
 ## Permissions
 
 App commands are allowed by default in Tauri 2. Capabilities
-(`src-tauri/capabilities/default.json`): `core:default` and `dialog:allow-save`
-(the export *Save as* dialog). The CSP restricts the
-webview to its own origin and the IPC endpoint.
+(`src-tauri/capabilities/default.json`): `core:default` only. The export
+*Save as* dialog is opened by the backend, so the window holds no dialog
+or file permission. The CSP restricts the webview to its own origin (its
+scripts, styles and SvelteKit's version file) and the IPC endpoint.

@@ -4,10 +4,10 @@
    * Turns the backend feed on while mounted and polls it twice a second.
    */
   import { onDestroy, onMount } from "svelte";
-  import { api, errorMessage } from "$lib/api";
-  import type { CaptureInterface, PacketRow } from "$lib/api/types";
-  import { formatBytes } from "$lib/utils/format";
-  import { serviceName } from "$lib/utils/services";
+  import { api, errorMessage } from "#lib/api/index.ts";
+  import type { CaptureInterface, PacketRow } from "#lib/api/types.ts";
+  import { formatBytes } from "#lib/utils/format.ts";
+  import { serviceName } from "#lib/utils/services.ts";
 
   interface Props {
     interfaces: CaptureInterface[];

@@ -1,12 +1,12 @@
 <script lang="ts">
   /** Endpoints of a recording (totals over the recording). Click to chart one. */
-  import type { AddrScope, EndpointRecord, NameSource, Units } from "$lib/api/types";
-  import { formatBytes, formatDuration, rateText } from "$lib/utils/format";
-  import { serviceName } from "$lib/utils/services";
+  import type { AddrScope, EndpointRecord, NameSource, Units } from "#lib/api/types.ts";
+  import { formatBytes, formatDuration, rateText } from "#lib/utils/format.ts";
+  import { serviceName } from "#lib/utils/services.ts";
   import LevelBadge from "../../components/LevelBadge.svelte";
   import OwnerCell from "../../components/OwnerCell.svelte";
-  import { ownerText } from "$lib/utils/geo";
-  import { GRADE_COLOR, lossGrade, msText, pctText, rttGrade } from "$lib/utils/quality";
+  import { ownerText } from "#lib/utils/geo.ts";
+  import { GRADE_COLOR, lossGrade, msText, pctText, rttGrade } from "#lib/utils/quality.ts";
 
   interface Props {
     endpoints: EndpointRecord[];

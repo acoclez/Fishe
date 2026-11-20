@@ -1,6 +1,6 @@
 <script lang="ts">
   /** Tiny rate trend for a table row: total (in + out) over the last points. */
-  import type { TrafficPoint } from "$lib/api/types";
+  import type { TrafficPoint } from "#lib/api/types.ts";
 
   let { points, width = 96, height = 22 }: { points: TrafficPoint[]; width?: number; height?: number } = $props();
 

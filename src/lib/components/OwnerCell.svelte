@@ -1,7 +1,7 @@
 <script lang="ts">
   /** Network owner + country badge for an endpoint row. */
-  import type { Owner } from "$lib/api/types";
-  import { countryName, ownerTitle } from "$lib/utils/geo";
+  import type { Owner } from "#lib/api/types.ts";
+  import { countryName, ownerTitle } from "#lib/utils/geo.ts";
 
   let { owner }: { owner: Owner | null | undefined } = $props();
 </script>

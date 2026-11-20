@@ -5,19 +5,19 @@
    * lives in src/lib/pages/.
    */
   import { onMount, tick, untrack } from "svelte";
-  import { api, inTauri } from "$lib/api";
-  import ArchivePage from "$lib/pages/archive/ArchivePage.svelte";
-  import HeaderStatus from "$lib/shell/HeaderStatus.svelte";
-  import Rail from "$lib/shell/Rail.svelte";
-  import SettingsPage from "$lib/pages/settings/SettingsPage.svelte";
-  import Toasts from "$lib/shell/Toasts.svelte";
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { PAGES, nav, type Page } from "$lib/stores/nav.svelte";
-  import ConnectionsPage from "$lib/pages/connections/ConnectionsPage.svelte";
-  import LivePage from "$lib/pages/live/LivePage.svelte";
-  import MapPage from "$lib/pages/map/MapPage.svelte";
-  import { session } from "$lib/stores/session.svelte";
-  import { settings } from "$lib/stores/settings.svelte";
+  import { api, inTauri } from "#lib/api/index.ts";
+  import ArchivePage from "#lib/pages/archive/ArchivePage.svelte";
+  import HeaderStatus from "#lib/shell/HeaderStatus.svelte";
+  import Rail from "#lib/shell/Rail.svelte";
+  import SettingsPage from "#lib/pages/settings/SettingsPage.svelte";
+  import Toasts from "#lib/shell/Toasts.svelte";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { PAGES, nav, type Page } from "#lib/stores/nav.svelte.ts";
+  import ConnectionsPage from "#lib/pages/connections/ConnectionsPage.svelte";
+  import LivePage from "#lib/pages/live/LivePage.svelte";
+  import MapPage from "#lib/pages/map/MapPage.svelte";
+  import { session } from "#lib/stores/session.svelte.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
 
   onMount(() => {
     session.init();

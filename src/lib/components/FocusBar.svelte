@@ -4,8 +4,8 @@
    * whole session, one endpoint or one program) and a way back. Always
    * present at a fixed height, so focusing never moves the page.
    */
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { session } from "$lib/stores/session.svelte";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
 
   const focusEp = $derived(session.focusEp);
   const focusProg = $derived(session.focusProg);

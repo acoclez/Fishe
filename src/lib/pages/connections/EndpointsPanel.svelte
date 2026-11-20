@@ -10,18 +10,18 @@
    */
   import { untrack } from "svelte";
   import { flip } from "svelte/animate";
-  import type { AddrScope, EndpointRow, TrafficPoint, NameSource, Units } from "$lib/api/types";
-  import { StableList } from "$lib/stores/stable.svelte";
-  import { formatBytes, rateText } from "$lib/utils/format";
-  import { serviceName } from "$lib/utils/services";
-  import { monitor } from "$lib/stores/monitor.svelte";
+  import type { AddrScope, EndpointRow, TrafficPoint, NameSource, Units } from "#lib/api/types.ts";
+  import { StableList } from "#lib/stores/stable.svelte.ts";
+  import { formatBytes, rateText } from "#lib/utils/format.ts";
+  import { serviceName } from "#lib/utils/services.ts";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
   import LevelBadge from "../../components/LevelBadge.svelte";
   import Sparkline from "../../components/Sparkline.svelte";
   import OwnerCell from "../../components/OwnerCell.svelte";
-  import { ownerText } from "$lib/utils/geo";
-  import { routes } from "$lib/stores/routes.svelte";
-  import { pings } from "$lib/stores/pings.svelte";
-  import { GRADE_COLOR, lossGrade, msText, pctText, rttGrade } from "$lib/utils/quality";
+  import { ownerText } from "#lib/utils/geo.ts";
+  import { routes } from "#lib/stores/routes.svelte.ts";
+  import { pings } from "#lib/stores/pings.svelte.ts";
+  import { GRADE_COLOR, lossGrade, msText, pctText, rttGrade } from "#lib/utils/quality.ts";
 
   const pingable = (r: EndpointRow) => !["multicast", "broadcast", "unspecified"].includes(r.scope);
   function rttTitle(r: EndpointRow): string {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.1 (2026-11-20)
+
+The first version with installers. 0.15.0 was published as source only; the
+features are listed under 0.15.0 in CHANGELOG.md.
+
+- The interface is built with SvelteKit 3 instead of SvelteKit 2, which has
+  open security advisories. They concern server features Fishe does not use
+  (it ships as static files inside the app), so 0.15.0 was not exposed; the
+  affected code is no longer part of the build.
+
 ## 0.15.0 (2026-11-19)
 
 First public release.

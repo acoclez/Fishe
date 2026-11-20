@@ -15,12 +15,12 @@
    * flowing (only while pointing, and never with reduced motion).
    */
   import { onDestroy, onMount, untrack } from "svelte";
-  import { routes } from "$lib/stores/routes.svelte";
-  import { settings } from "$lib/stores/settings.svelte";
-  import { buildGraph, curvePath, layout, type GEdge, type GNode, type Layout, type MapEndpoint } from "$lib/utils/netgraph";
-  import { formatBytes, rateText } from "$lib/utils/format";
-  import { countryName, ownerText } from "$lib/utils/geo";
-  import type { Units } from "$lib/api/types";
+  import { routes } from "#lib/stores/routes.svelte.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
+  import { buildGraph, curvePath, layout, type GEdge, type GNode, type Layout, type MapEndpoint } from "#lib/utils/netgraph.ts";
+  import { formatBytes, rateText } from "#lib/utils/format.ts";
+  import { countryName, ownerText } from "#lib/utils/geo.ts";
+  import type { Units } from "#lib/api/types.ts";
 
   interface Props {
     endpoints: MapEndpoint[];

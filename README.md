@@ -92,7 +92,7 @@ a token. See [docs/mcp.md](docs/mcp.md).
 
 ## Build from source
 
-Requires Rust (stable, MSVC), Node.js 20 or later, and Npcap.
+Requires Rust (stable, MSVC), Node.js 22.17 or later, and Npcap.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup-npcap-sdk.ps1

@@ -1,7 +1,7 @@
 <script lang="ts">
   /** Cumulative bytes per transport protocol: one hue (magnitude), labelled rows. */
-  import type { TransportBytes } from "$lib/api/types";
-  import { formatBytes, formatPercent } from "$lib/utils/format";
+  import type { TransportBytes } from "#lib/api/types.ts";
+  import { formatBytes, formatPercent } from "#lib/utils/format.ts";
 
   let { transports }: { transports: TransportBytes | null } = $props();
 

@@ -5,8 +5,8 @@
    * (its licence asks users to install it themselves). Says what it is, how
    * to get it, and looks again without a restart.
    */
-  import { api, errorMessage } from "$lib/api";
-  import { session } from "$lib/stores/session.svelte";
+  import { api, errorMessage } from "#lib/api/index.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
 
   let checking = $state(false);
   /** A check that still found nothing: say so, and where we looked. */

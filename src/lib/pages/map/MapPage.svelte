@@ -1,10 +1,10 @@
 <script lang="ts">
   /** Map: devices on the LAN, then the session's endpoints laid out by distance (or the host target's route). */
-  import FocusBar from "$lib/components/FocusBar.svelte";
-  import LanScan from "$lib/pages/map/LanScan.svelte";
-  import NetworkMap from "$lib/pages/map/NetworkMap.svelte";
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { session } from "$lib/stores/session.svelte";
+  import FocusBar from "#lib/components/FocusBar.svelte";
+  import LanScan from "#lib/pages/map/LanScan.svelte";
+  import NetworkMap from "#lib/pages/map/NetworkMap.svelte";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
 
   const s = $derived(monitor.latest);
 </script>

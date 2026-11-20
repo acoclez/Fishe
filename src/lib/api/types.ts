@@ -4,7 +4,7 @@
  * Everything that crosses the IPC boundary is generated from the Rust
  * definitions into `bindings.ts` (tauri-specta; see docs/ipc-api.md) and
  * re-exported here, so the UI imports its types from one place
- * (`$lib/api/types`). Only UI-only types are declared below.
+ * (`#lib/api/types.ts`). Only UI-only types are declared below.
  */
 import type { Level } from "./bindings";
 

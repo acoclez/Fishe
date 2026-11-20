@@ -4,12 +4,12 @@
    * recording, connected agents, running pings, the live session (target,
    * owner, interface, clock) or, with nothing running, Npcap's state.
    */
-  import { agents } from "$lib/stores/agents.svelte";
-  import { formatCount, formatDuration } from "$lib/utils/format";
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { PAGES, nav } from "$lib/stores/nav.svelte";
-  import { pings } from "$lib/stores/pings.svelte";
-  import { session } from "$lib/stores/session.svelte";
+  import { agents } from "#lib/stores/agents.svelte.ts";
+  import { formatCount, formatDuration } from "#lib/utils/format.ts";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { PAGES, nav } from "#lib/stores/nav.svelte.ts";
+  import { pings } from "#lib/stores/pings.svelte.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
   import OwnerCell from "../components/OwnerCell.svelte";
 
   const s = $derived(monitor.latest);

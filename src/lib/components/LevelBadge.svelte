@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Level } from "$lib/api/types";
+  import type { Level } from "#lib/api/types.ts";
 
   let { level, size = "md" }: { level: Level; size?: "sm" | "md" } = $props();
 

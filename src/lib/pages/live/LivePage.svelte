@@ -1,22 +1,22 @@
 <script lang="ts">
   /** Live: the target bar, the gauge and tiles, the chart, quality, the busiest few, protocols and ports. */
-  import FocusBar from "$lib/components/FocusBar.svelte";
-  import Gauge from "$lib/pages/live/Gauge.svelte";
-  import LevelBadge from "$lib/components/LevelBadge.svelte";
-  import NpcapMissing from "$lib/pages/live/NpcapMissing.svelte";
-  import ProcessInfo from "$lib/pages/live/ProcessInfo.svelte";
-  import ProtocolBreakdown from "$lib/pages/live/ProtocolBreakdown.svelte";
-  import QualityCard from "$lib/pages/live/QualityCard.svelte";
-  import StatTile from "$lib/components/StatTile.svelte";
-  import TargetForm from "$lib/pages/live/TargetForm.svelte";
-  import TopList from "$lib/pages/live/TopList.svelte";
-  import TopPorts from "$lib/pages/live/TopPorts.svelte";
-  import TrafficChart from "$lib/components/TrafficChart.svelte";
-  import { formatBytes, formatCount } from "$lib/utils/format";
-  import { monitor } from "$lib/stores/monitor.svelte";
-  import { nav } from "$lib/stores/nav.svelte";
-  import { session } from "$lib/stores/session.svelte";
-  import { settings } from "$lib/stores/settings.svelte";
+  import FocusBar from "#lib/components/FocusBar.svelte";
+  import Gauge from "#lib/pages/live/Gauge.svelte";
+  import LevelBadge from "#lib/components/LevelBadge.svelte";
+  import NpcapMissing from "#lib/pages/live/NpcapMissing.svelte";
+  import ProcessInfo from "#lib/pages/live/ProcessInfo.svelte";
+  import ProtocolBreakdown from "#lib/pages/live/ProtocolBreakdown.svelte";
+  import QualityCard from "#lib/pages/live/QualityCard.svelte";
+  import StatTile from "#lib/components/StatTile.svelte";
+  import TargetForm from "#lib/pages/live/TargetForm.svelte";
+  import TopList from "#lib/pages/live/TopList.svelte";
+  import TopPorts from "#lib/pages/live/TopPorts.svelte";
+  import TrafficChart from "#lib/components/TrafficChart.svelte";
+  import { formatBytes, formatCount } from "#lib/utils/format.ts";
+  import { monitor } from "#lib/stores/monitor.svelte.ts";
+  import { nav } from "#lib/stores/nav.svelte.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
 
   const s = $derived(monitor.latest);
   const view = $derived(session.view);

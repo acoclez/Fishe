@@ -1,8 +1,8 @@
 <script lang="ts">
   /** Busiest service ports (lower port of each flow), cumulative. */
-  import type { PortUsage } from "$lib/api/types";
-  import { formatBytes, formatCount } from "$lib/utils/format";
-  import { serviceName } from "$lib/utils/services";
+  import type { PortUsage } from "#lib/api/types.ts";
+  import { formatBytes, formatCount } from "#lib/utils/format.ts";
+  import { serviceName } from "#lib/utils/services.ts";
 
   let { ports, totalBytes }: { ports: PortUsage[]; totalBytes: number } = $props();
 </script>

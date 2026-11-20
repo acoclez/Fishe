@@ -1,10 +1,10 @@
 <script lang="ts">
   /** Saved recordings: list, rename, export, reveal, delete; opens a replay. */
   import { onMount } from "svelte";
-  import { api, errorMessage } from "$lib/api";
-  import { formatBytes, formatDuration, rateText } from "$lib/utils/format";
-  import { settings } from "$lib/stores/settings.svelte";
-  import type { ExportFormat, RecordingSummary } from "$lib/api/types";
+  import { api, errorMessage } from "#lib/api/index.ts";
+  import { formatBytes, formatDuration, rateText } from "#lib/utils/format.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
+  import type { ExportFormat, RecordingSummary } from "#lib/api/types.ts";
   import LevelBadge from "../../components/LevelBadge.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import RecordingView from "./RecordingView.svelte";

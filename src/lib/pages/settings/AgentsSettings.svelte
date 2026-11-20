@@ -8,8 +8,8 @@
    * client (right) side by side; activity underneath.
    */
   import { onMount } from "svelte";
-  import { agents } from "$lib/stores/agents.svelte";
-  import type { McpAccess } from "$lib/api/types";
+  import { agents } from "#lib/stores/agents.svelte.ts";
+  import type { McpAccess } from "#lib/api/types.ts";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
 
   const LEVELS: { id: McpAccess; label: string; hint: string }[] = [

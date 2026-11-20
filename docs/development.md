@@ -8,7 +8,7 @@
 | Npcap (runtime) | any recent | <https://npcap.com>, default install options |
 | Npcap SDK (build) | 1.17 | `scripts/setup-npcap-sdk.ps1` → `vendor/npcap-sdk` |
 | Rust | stable, `x86_64-pc-windows-msvc` | needs VS Build Tools (C++ workload) |
-| Node.js | 20+ (26 used) | npm |
+| Node.js | 22.17+ (26 used) | npm; the minimum is SvelteKit 3's |
 | WebView2 | evergreen | preinstalled on Windows 10/11 |
 | Docker Desktop | optional | only for the Linux check of the core (`npm run check:linux`) |
 

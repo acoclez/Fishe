@@ -1,7 +1,7 @@
 <script lang="ts">
   /** Process / all-traffic status strip: what is bound, how it's attributed. */
-  import type { ProcessTick, SessionInfo } from "$lib/api/types";
-  import { formatCount } from "$lib/utils/format";
+  import type { ProcessTick, SessionInfo } from "#lib/api/types.ts";
+  import { formatCount } from "#lib/utils/format.ts";
 
   let {
     session,

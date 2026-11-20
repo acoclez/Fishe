@@ -6,11 +6,11 @@
    * a few common ports), so results replace the previous set atomically — the
    * list and the map are drawn once per scan and never reflow on their own.
    */
-  import { api, errorMessage } from "$lib/api";
-  import { nav } from "$lib/stores/nav.svelte";
-  import { session } from "$lib/stores/session.svelte";
-  import { settings } from "$lib/stores/settings.svelte";
-  import type { LanDevice, LanNetwork, LanScan } from "$lib/api/types";
+  import { api, errorMessage } from "#lib/api/index.ts";
+  import { nav } from "#lib/stores/nav.svelte.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
+  import { settings } from "#lib/stores/settings.svelte.ts";
+  import type { LanDevice, LanNetwork, LanScan } from "#lib/api/types.ts";
 
   let scanning = $state(false);
   let result = $state<LanScan | null>(null);

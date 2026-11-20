@@ -5,7 +5,7 @@ resolver = "3"
 members = ["crates/fishe-core", "src-tauri"]
 
 [workspace.package]
-version = "0.15.0"
+version = "0.15.1"
 authors = ["Antoine Coclez"]
 edition = "2024"
 license = "MIT"
