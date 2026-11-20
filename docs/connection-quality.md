@@ -84,7 +84,7 @@ packet of it is counted, or are dropped if it belongs to another program.
 ## Ping
 
 **Ping** (card) or **◉** (endpoint row) sends one ICMP echo per second to
-that address through the Windows ICMP API (no admin), until stopped, for at
+that address (the Windows ICMP API, no admin; a raw ICMP socket on Linux), until stopped, for at
 most 30 minutes, at most 4 addresses at once. A reply later than 1 s counts
 as lost.
 

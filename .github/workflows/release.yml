@@ -1,18 +1,18 @@
-# Builds the Windows installers and opens a GitHub release when a version tag
-# is pushed:
+# Builds the Windows installers and the Linux packages, and opens a GitHub
+# release, when a version tag is pushed:
 #
 #   npm run version:set -- 0.16.0     # then write the CHANGELOG entry
 #   git commit -am "Fishe 0.16.0"
 #   git tag v0.16.0 && git push && git push --tags
 #
-# The release is created as a draft with the installers attached and the
-# changelog entry as its notes: look it over, then press Publish. Set
-# `releaseDraft: false` below to publish without that step.
+# The release is created as a draft with the changelog entry as its notes;
+# the two build jobs attach their files to it (.exe and .msi from Windows,
+# .deb and .rpm from Linux). Look it over, then press Publish.
 #
-# The installers are not code-signed (see docs/development.md, Releases).
+# Nothing is code-signed (see docs/development.md, Releases).
 #
-# This job can write to the repository's releases, so it takes nothing on
-# trust: actions are pinned to a commit (see ci.yml), the Npcap SDK is
+# This workflow can write to the repository's releases, so it takes nothing
+# on trust: actions are pinned to a commit (see ci.yml), the Npcap SDK is
 # checked against known hashes, dependencies come from Cargo.lock and
 # package-lock.json exactly as committed, and no build cache is restored.
 name: Release
@@ -25,25 +25,23 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: pwsh
+  # The tag is the release: it must name the version the files carry, and
+  # that version must have its changelog entry. Opens the draft first, so
+  # the two builds below attach to one release instead of racing to create it.
+  draft:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-          cache: npm
 
-      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
-
-      # The tag is the release: it must name the version the files carry,
-      # and that version must have its changelog entry.
       - name: Version and notes
         id: meta
+        shell: pwsh
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           if ("v$version" -ne $env:GITHUB_REF_NAME) {
@@ -55,37 +53,68 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "no changelog entry for $version" }
           "version=$version" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
 
+      # A re-run finds the draft of the first attempt and keeps it.
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: Fishe ${{ steps.meta.outputs.version }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "$TITLE" --notes-file release-notes.md
+
+  build:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux on the oldest supported runner: a package built there runs
+        # on that distribution's C library and every newer one.
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
+
       # Build-time import libraries for the pcap crate. Npcap itself is not
       # shipped: users install it (the app tells them how).
       - name: Npcap SDK
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: ./scripts/setup-npcap-sdk.ps1
+
+      # libpcap for capture, WebKitGTK and friends for the window.
+      - name: System libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpcap-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev rpm
 
       - name: Install JS dependencies
         run: npm ci
 
       # The same checks as CI: a tag never releases what would not pass.
+      # bash on both systems: it stops at the first command that fails.
       - name: Checks
+        shell: bash
         run: |
           npm run check
           npm test
           cargo test --workspace --locked
 
-      - name: Release notes
-        id: notes
-        run: |
-          $delimiter = "NOTES_$([guid]::NewGuid().ToString('N'))"
-          "body<<$delimiter" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
-          Get-Content release-notes.md | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
-          $delimiter | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
-
-      # Builds the frontend and the app in release mode, bundles the NSIS
-      # and MSI installers, and attaches them to the release for this tag.
+      # Builds the frontend and the app in release mode, bundles the
+      # packages of this system (NSIS and MSI, or deb and rpm: see
+      # src-tauri/tauri.linux.conf.json) and attaches them to the draft.
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Fishe ${{ steps.meta.outputs.version }}
-          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseName: Fishe ${{ needs.draft.outputs.version }}
           releaseDraft: true
           prerelease: false

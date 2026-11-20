@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["deb", "rpm"],
+    "linux": {
+      "deb": {
+        "depends": ["libpcap0.8"],
+        "section": "net"
+      },
+      "rpm": {
+        "depends": ["libpcap"]
+      }
+    }
+  }
+}

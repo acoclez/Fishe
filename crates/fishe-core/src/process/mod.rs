@@ -7,7 +7,7 @@
 //! | source | how | needs admin | catches |
 //! |---|---|---|---|
 //! | [`sockets`] | poll the socket table every tick: Windows' TCP/UDP tables (`GetExtended{Tcp,Udp}Table`), or `/proc` on Linux ([`procfs`]) | no on Windows; on Linux root is needed to see other users' programs | every socket alive at poll time |
-//! | [`etw`] | Microsoft-Windows-Kernel-Network events (connect / accept / UDP send / recv); Windows only | yes | short-lived sockets the poll would miss |
+//! | [`etw`] | Microsoft-Windows-Kernel-Network events (connect / accept / UDP send / recv); Windows | yes | short-lived sockets the poll would miss |
 //!
 //! [`scope`] decides which packets belong to a monitored program (process
 //! mode); [`machine`] labels every packet with its owner (all-traffic mode);

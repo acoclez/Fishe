@@ -42,6 +42,27 @@ where
         .map_err(|e| AppError::Internal(format!("worker task failed: {e}")))?
 }
 
+/// Hand a folder or a web address to the desktop: Explorer on Windows, the
+/// user's file manager or browser elsewhere.
+fn open_on_desktop(target: &std::ffi::OsStr, what: &'static str) -> AppResult<()> {
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    let mut child = std::process::Command::new(program)
+        .arg(target)
+        .spawn()
+        .map_err(|e| AppError::io(what, e))?;
+    // Collect its exit status when it ends, so no finished process lingers.
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
+}
+
 /// Whether Npcap was found, and its version.
 #[tauri::command]
 #[specta::specta]
@@ -50,30 +71,29 @@ pub fn npcap_status() -> NpcapStatus {
 }
 
 /// Look for Npcap again, after the user installed it while Fishe was running.
+/// (On Linux the answer cannot change while Fishe runs: see `npcap.rs`.)
 #[tauri::command]
 #[specta::specta]
 pub fn npcap_recheck() -> NpcapStatus {
     let status = npcap::recheck();
     match &status.message {
         None => log::info!(
-            "Npcap found: {}",
+            "capture available: {}",
             status.version.as_deref().unwrap_or("unknown version")
         ),
-        Some(why) => log::info!("Npcap still unavailable: {why}"),
+        Some(why) => log::info!("capture still unavailable: {why}"),
     }
     status
 }
 
 /// Open Npcap's download page in the default browser. The address is fixed
 /// (`npcap::DOWNLOAD_URL`): the window cannot make the app open anything else.
+/// Windows only: nowhere else is there anything to download.
 #[tauri::command]
 #[specta::specta]
 pub fn open_npcap_site() -> AppResult<()> {
     #[cfg(windows)]
-    std::process::Command::new("explorer")
-        .arg(npcap::DOWNLOAD_URL)
-        .spawn()
-        .map_err(|e| AppError::io("cannot open the browser", e))?;
+    open_on_desktop(npcap::DOWNLOAD_URL.as_ref(), "cannot open the browser")?;
     Ok(())
 }
 
@@ -117,11 +137,23 @@ pub async fn list_processes() -> AppResult<Vec<ProcessGroup>> {
     blocking(processes::groups).await
 }
 
+/// The system Fishe runs on, for the wording that differs (how capture is
+/// allowed, what the file manager is called).
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Platform {
+    Windows,
+    Linux,
+    Other,
+}
+
 /// What this instance can do (elevation decides whether ETW is used).
 #[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Capabilities {
+    pub platform: Platform,
     pub process_mode: bool,
+    /// Administrator on Windows, root on Linux.
     pub elevated: bool,
     pub etw: bool,
 }
@@ -131,6 +163,13 @@ pub struct Capabilities {
 pub fn system_capabilities() -> Capabilities {
     let elevated = elevation::is_elevated();
     Capabilities {
+        platform: if cfg!(windows) {
+            Platform::Windows
+        } else if cfg!(target_os = "linux") {
+            Platform::Linux
+        } else {
+            Platform::Other
+        },
         process_mode: fishe_core::process::SUPPORTED,
         elevated,
         etw: cfg!(windows) && elevated,
@@ -298,7 +337,8 @@ pub fn archive_location(svc: Svc<'_>) -> String {
     svc.archive.dir().display().to_string()
 }
 
-/// Show a file from the archive folder in Explorer.
+/// Show a file from the archive folder in the file manager: selected in
+/// Explorer on Windows; elsewhere its folder is opened.
 #[tauri::command]
 #[specta::specta]
 pub fn reveal_in_folder(svc: Svc<'_>, path: String) -> AppResult<()> {
@@ -321,6 +361,11 @@ pub fn reveal_in_folder(svc: Svc<'_>, path: String) -> AppResult<()> {
             .spawn()
             .map_err(|e| AppError::io("cannot open Explorer", e))?;
     }
+    #[cfg(not(windows))]
+    open_on_desktop(
+        p.parent().unwrap_or(&p).as_os_str(),
+        "cannot open the file manager",
+    )?;
     Ok(())
 }
 
@@ -333,18 +378,13 @@ pub fn logs_location(svc: Svc<'_>) -> String {
     svc.paths.logs().display().to_string()
 }
 
-/// Open the logs folder in Explorer (created if it does not exist yet).
+/// Open the logs folder in the file manager (created if it does not exist yet).
 #[tauri::command]
 #[specta::specta]
 pub fn open_logs_folder(svc: Svc<'_>) -> AppResult<()> {
     let dir = svc.paths.logs();
     std::fs::create_dir_all(&dir).map_err(|e| AppError::io("cannot create the logs folder", e))?;
-    #[cfg(windows)]
-    std::process::Command::new("explorer")
-        .arg(&dir)
-        .spawn()
-        .map_err(|e| AppError::io("cannot open Explorer", e))?;
-    Ok(())
+    open_on_desktop(dir.as_os_str(), "cannot open the file manager")
 }
 
 // ─────────────────────────── owner & country ───────────────────────────

@@ -209,7 +209,7 @@ struct StartArgs {
     process: Option<String>,
     /// mode process: a single PID instead of a name
     pid: Option<u32>,
-    /// Npcap device name; default automatic
+    /// Capture device name (from list_interfaces); default automatic
     interface: Option<String>,
 }
 
@@ -361,7 +361,7 @@ const TOOLS: &[Tool] = &[
     Tool {
         name: "list_interfaces",
         title: "Network interfaces",
-        description: "Capture interfaces (Npcap device name, description, addresses, up/running, loopback, wireless).",
+        description: "Capture interfaces (device name, description, addresses, up/running, loopback, wireless).",
         access: Access::Read,
         schema: schema_of::<NoArgs>,
         handler: |svc, v| list_interfaces(svc, parse(v)?),

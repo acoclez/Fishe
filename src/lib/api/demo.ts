@@ -56,6 +56,7 @@ const DEMO_NPCAP: NpcapStatus = {
   dllDir: null,
   version: "Demo mode: simulated traffic",
   message: null,
+  grantCommand: null,
 };
 /** What the app reports on a PC without Npcap. */
 const DEMO_NPCAP_MISSING: NpcapStatus = {
@@ -63,12 +64,29 @@ const DEMO_NPCAP_MISSING: NpcapStatus = {
   dllDir: "C:\\Windows\\System32\\Npcap",
   version: null,
   message: "wpcap.dll not found. Install Npcap from https://npcap.com (the default options are fine).",
+  grantCommand: null,
+};
+/** What the app reports on Linux before it was allowed to capture. */
+const DEMO_CAPTURE_NOT_ALLOWED: NpcapStatus = {
+  available: false,
+  dllDir: null,
+  version: null,
+  message: "Fishe is not allowed to capture packets: it needs the CAP_NET_RAW capability (or to run as root).",
+  grantCommand: "sudo setcap cap_net_raw=ep /usr/bin/fishe",
 };
 // Open the preview with `?npcap-missing` to see the install prompt: the first
-// "Check again" still finds nothing, the second one finds it.
-const demoNpcapMissing = typeof location !== "undefined" && new URLSearchParams(location.search).has("npcap-missing");
+// "Check again" still finds nothing, the second one finds it. `?linux` makes
+// the preview speak as it does on Linux, where the same parameter shows the
+// permission prompt instead (which only a restart resolves).
+const demoParams = typeof location !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
+const demoNpcapMissing = demoParams.has("npcap-missing");
+const demoLinux = demoParams.has("linux");
 let demoRechecks = 0;
-export const demoNpcap = (): NpcapStatus => (demoNpcapMissing && demoRechecks < 2 ? DEMO_NPCAP_MISSING : DEMO_NPCAP);
+export const demoNpcap = (): NpcapStatus => {
+  if (!demoNpcapMissing) return DEMO_NPCAP;
+  if (demoLinux) return DEMO_CAPTURE_NOT_ALLOWED;
+  return demoRechecks < 2 ? DEMO_NPCAP_MISSING : DEMO_NPCAP;
+};
 export const demoNpcapRecheck = (): NpcapStatus => {
   demoRechecks++;
   return demoNpcap();
@@ -86,7 +104,7 @@ export const demoInterfaces: InterfaceInfo[] = [
   },
 ];
 
-export const demoCapabilities: Capabilities = { processMode: true, elevated: false, etw: false };
+export const demoCapabilities: Capabilities = { platform: demoLinux ? "linux" : "windows", processMode: true, elevated: false, etw: false };
 
 const DEMO_PROCS: ProcessGroup[] = [
   { name: "chrome.exe", pids: [4120, 4188, 5012, 6630], exePath: "C:\Program Files\Google\Chrome\Application\chrome.exe", sockets: 64, connections: 41, listening: 0 },

@@ -64,6 +64,9 @@ Settings → Developer → Edit Config, merge into
 { "mcpServers": { "fishe": { "command": "C:\\Program Files\\Fishe\\fishe.exe", "args": ["--mcp-stdio"] } } }
 ```
 
+On Linux the command is `/usr/bin/fishe`; Settings shows the configuration
+with the right path for the copy that is running.
+
 `fishe.exe --mcp-stdio` opens no window: it forwards each JSON-RPC line
 from stdin to the running Fishe and writes the answer to stdout, reading
 the port and token from `%APPDATA%\com.fishe.app\mcp.json` on every

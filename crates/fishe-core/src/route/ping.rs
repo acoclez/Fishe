@@ -267,10 +267,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(
-        not(windows),
-        ignore = "needs an ICMP implementation for this platform"
-    )]
+    #[cfg_attr(not(windows), ignore = "needs CAP_NET_RAW on Linux; no ICMP elsewhere")]
     fn loopback_ping_and_limits() {
         let book = PingBook::default();
         let lo: IpAddr = [127, 0, 0, 1].into();

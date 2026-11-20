@@ -1,6 +1,6 @@
 # Runs on every push to main and on every pull request.
-# Two jobs: the whole workspace on Windows (the app is Windows-only), and the
-# core crate on Linux, which has no window in it and must keep building there.
+# Two jobs, the whole workspace on each system Fishe runs on: Windows (with
+# the Npcap SDK) and Linux (with libpcap and WebKitGTK).
 #
 # Actions are pinned to a commit (the comment names the version): a tag can
 # be moved to other code, a commit cannot. Dependabot proposes the updates
@@ -73,13 +73,18 @@ jobs:
       - name: App build
         run: npm run tauri build -- --debug --no-bundle
 
-  # fishe-core on Linux with libpcap. Parts that only exist on Windows
-  # (ETW, ICMP probes, the LAN scan) compile to stubs there;
-  # this keeps the rest honest. Locally: scripts/linux-check.ps1.
-  core-linux:
+  # The same on Linux: the core with libpcap, the window on WebKitGTK.
+  # Tests that send packets or need the capture permission are not run here
+  # (they are `#[ignore]`d). Locally, from Windows: scripts/linux-check.ps1.
+  linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
 
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
         with:
@@ -89,11 +94,24 @@ jobs:
         with:
           workspaces: ". -> src-tauri/target"
 
-      - name: libpcap
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpcap-dev
+      # libpcap for capture, WebKitGTK and friends for the window.
+      - name: System libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpcap-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Frontend build
+        run: npm run build
 
       - name: clippy
-        run: cargo clippy -p fishe-core --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Unit tests
-        run: cargo test -p fishe-core --locked
+        run: cargo test --workspace --locked
+
+      # The real binary (frontend embedded, no package).
+      - name: App build
+        run: npm run tauri build -- --debug --no-bundle

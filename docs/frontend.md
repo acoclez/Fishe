@@ -25,6 +25,7 @@ src/
    │  ├─ settings.svelte.ts   persisted preferences + sensitivity presets
    │  ├─ nav.svelte.ts        current page, number keys, scroll per page, settings sections
    │  ├─ routes.svelte.ts     traceroute queue/results, gateways & neighbours
+   │  ├─ lan.svelte.ts        the last LAN scan, kept while the app is open
    │  ├─ pings.svelte.ts      running pings
    │  ├─ agents.svelte.ts     MCP server status, activity log, backend notices
    │  └─ stable.svelte.ts     StableList: rows that hold still while you read them
@@ -60,7 +61,8 @@ src/
       │  ├─ TopList.svelte           five busiest programs or endpoints, "All N →"
       │  ├─ ProtocolBreakdown.svelte
       │  ├─ TopPorts.svelte
-      │  └─ NpcapMissing.svelte      without Npcap: what it is, how to install it, Check again
+      │  ├─ NpcapMissing.svelte      Windows without Npcap: what it is, how to install it, Check again
+      │  └─ CaptureRights.svelte     Linux without the capture permission: the command that grants it
       ├─ connections/
       │  ├─ ConnectionsPage.svelte   programs, endpoints or packets
       │  ├─ ProgramsPanel.svelte     programs using the network (all-traffic mode), click to focus, Monitor ▸
@@ -333,7 +335,9 @@ not contain it.
 
 Open the preview with `?npcap-missing` to see the app as on a PC without
 Npcap: the install prompt, the header chip, the disabled LAN scan. The first
-**Check again** still finds nothing, the second one finds it.
+**Check again** still finds nothing, the second one finds it. Add `?linux`
+(`?linux&npcap-missing`) for the wording used on Linux and its permission
+prompt.
 
 ## Accessibility
 

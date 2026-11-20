@@ -128,9 +128,8 @@ Reproduce with `FISHE_LIVE_BYTES=200000 FISHE_LIVE_RUNS=12 cargo test -- --ignor
 
 ## On Linux
 
-The core crate also builds on Linux, where attribution follows the same
-model with `/proc` as the socket table (`process/procfs.rs`). The desktop
-app itself is Windows-only.
+On Linux attribution follows the same model with `/proc` as the socket
+table (`process/procfs.rs`).
 
 | | Windows | Linux |
 |---|---|---|

@@ -64,12 +64,19 @@
       </span>
       {#if s}<span class="num muted clock">{formatDuration(s.tMs)}</span>{/if}
     {:else if session.npcap?.available}
-      <span class="chip" title={session.npcap.dllDir ?? ""}>{session.npcap.version ?? "Npcap ready"}</span>
+      <span class="chip" title={session.npcap.dllDir ?? ""}>{session.npcap.version ?? "Capture ready"}</span>
     {:else if session.npcap}
-      <!-- Not an error: Npcap is installed by the user. The Live page says how. -->
-      <button type="button" class="chip todo" onclick={() => nav.go("live")} title="Fishe needs Npcap to capture. Click to see how to install it.">
-        Npcap not installed
-      </button>
+      <!-- Not an error: Npcap is installed by the user, and on Linux the
+           permission to capture is theirs to grant. The Live page says how. -->
+      {#if session.linux}
+        <button type="button" class="chip todo" onclick={() => nav.go("live")} title="Fishe needs permission to capture. Click to see how to grant it.">
+          Capture not allowed
+        </button>
+      {:else}
+        <button type="button" class="chip todo" onclick={() => nav.go("live")} title="Fishe needs Npcap to capture. Click to see how to install it.">
+          Npcap not installed
+        </button>
+      {/if}
     {/if}
   </div>
 </header>

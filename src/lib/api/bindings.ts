@@ -10,11 +10,15 @@ import { invoke as __TAURI_INVOKE, Channel } from "@tauri-apps/api/core";
 export const commands = {
 	/**  Whether Npcap was found, and its version. */
 	npcapStatus: () => __TAURI_INVOKE<NpcapStatus>("npcap_status"),
-	/**  Look for Npcap again, after the user installed it while Fishe was running. */
+	/**
+	 *  Look for Npcap again, after the user installed it while Fishe was running.
+	 *  (On Linux the answer cannot change while Fishe runs: see `npcap.rs`.)
+	 */
 	npcapRecheck: () => __TAURI_INVOKE<NpcapStatus>("npcap_recheck"),
 	/**
 	 *  Open Npcap's download page in the default browser. The address is fixed
 	 *  (`npcap::DOWNLOAD_URL`): the window cannot make the app open anything else.
+	 *  Windows only: nowhere else is there anything to download.
 	 */
 	openNpcapSite: () => __TAURI_INVOKE<null>("open_npcap_site"),
 	/**  Default detector settings, so the UI can show and edit them. */
@@ -49,11 +53,14 @@ export const commands = {
 	exportRecording: (id: number, format: ExportFormat, suggestedName: string) => __TAURI_INVOKE<string | null>("export_recording", { id, format, suggestedName }),
 	/**  Where recordings are stored. */
 	archiveLocation: () => __TAURI_INVOKE<string>("archive_location"),
-	/**  Show a file from the archive folder in Explorer. */
+	/**
+	 *  Show a file from the archive folder in the file manager: selected in
+	 *  Explorer on Windows; elsewhere its folder is opened.
+	 */
 	revealInFolder: (path: string) => __TAURI_INVOKE<null>("reveal_in_folder", { path }),
 	/**  Folder holding `fishe.log` (and the rotated `fishe.1.log`). */
 	logsLocation: () => __TAURI_INVOKE<string>("logs_location"),
-	/**  Open the logs folder in Explorer (created if it does not exist yet). */
+	/**  Open the logs folder in the file manager (created if it does not exist yet). */
 	openLogsFolder: () => __TAURI_INVOKE<null>("open_logs_folder"),
 	geoStatus: () => __TAURI_INVOKE<GeoStatus>("geo_status"),
 	/**  Download (or update) DB-IP Lite. Only ever called from the user's click. */
@@ -159,7 +166,9 @@ export type AttributionMethod =
 
 /**  What this instance can do (elevation decides whether ETW is used). */
 export type Capabilities = {
+	platform: Platform,
 	processMode: boolean,
+	/**  Administrator on Windows, root on Linux. */
 	elevated: boolean,
 	etw: boolean,
 };
@@ -380,9 +389,15 @@ export type HopStatus =
 
 /**  A capture interface as shown in the UI. */
 export type InterfaceInfo = {
-	/**  Npcap device name, e.g. `\Device\NPF_{GUID}`. Used as the identifier. */
+	/**
+	 *  Capture device name: `\Device\NPF_{GUID}` with Npcap, `eth0` with
+	 *  libpcap. Used as the identifier.
+	 */
 	name: string,
-	/**  Adapter description, e.g. `Intel(R) Wi-Fi 6 AX201 160MHz`. */
+	/**
+	 *  Adapter description, e.g. `Intel(R) Wi-Fi 6 AX201 160MHz`; libpcap
+	 *  rarely has one, and the name stands in.
+	 */
 	description: string,
 	addresses: string[],
 	isUp: boolean,
@@ -539,12 +554,18 @@ export type NetContext = {
 export type NpcapStatus = {
 	/**  `true` when pcap functions can safely be called. */
 	available: boolean,
-	/**  Folder the DLLs were loaded from (Windows only). */
+	/**  Folder the Npcap DLLs were loaded from (Windows). */
 	dllDir: string | null,
 	/**  Version string reported by `pcap_lib_version()`. */
 	version: string | null,
 	/**  Human-readable explanation when unavailable. */
 	message: string | null,
+	/**
+	 *  Linux, when capturing is not permitted: the command that grants this
+	 *  executable the permission. `None` when no command can (the file sits
+	 *  where capabilities do not apply).
+	 */
+	grantCommand: string | null,
 };
 
 /**  One open port on a device, with the service it usually means. */
@@ -618,6 +639,12 @@ export type PingStatus = {
 	/**  Why probing stopped early (ICMP API failure). */
 	error: string | null,
 };
+
+/**
+ *  The system Fishe runs on, for the wording that differs (how capture is
+ *  allowed, what the file manager is called).
+ */
+export type Platform = "windows" | "linux" | "other";
 
 /**  Cumulative usage of one service port. */
 export type PortUsage = {
@@ -913,7 +940,7 @@ export type SessionInfo = {
 export type StartRequest = {
 	target: TargetSpec,
 	/**
-	 *  Npcap device name. `None`: host mode picks the route's interface,
+	 *  Capture device name. `None`: host mode picks the route's interface,
 	 *  process mode captures on every active interface.
 	 */
 	interface?: string | null,

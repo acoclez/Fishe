@@ -164,7 +164,7 @@
               <td><LevelBadge level={r.maxLevel} size="sm" /></td>
               <td>
                 {#if r.pcapPath}
-                  <button type="button" class="ghost file" onclick={() => reveal(r.pcapPath!)} title="Show in Explorer: {r.pcapPath}">
+                  <button type="button" class="ghost file" onclick={() => reveal(r.pcapPath!)} title="Show in its folder: {r.pcapPath}">
                     .pcapng · {r.pcapPackets.toLocaleString()} pkts{#if r.pcapBytes !== null} · {formatBytes(r.pcapBytes)}{/if}
                   </button>
                   {#if r.pcapDropped > 0}<span class="warn" title="Packets the file writer couldn't keep up with (not missing from the measurements)">{r.pcapDropped} skipped</span>{/if}

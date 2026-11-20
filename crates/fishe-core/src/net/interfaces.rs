@@ -8,9 +8,11 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket};
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InterfaceInfo {
-    /// Npcap device name, e.g. `\Device\NPF_{GUID}`. Used as the identifier.
+    /// Capture device name: `\Device\NPF_{GUID}` with Npcap, `eth0` with
+    /// libpcap. Used as the identifier.
     pub name: String,
-    /// Adapter description, e.g. `Intel(R) Wi-Fi 6 AX201 160MHz`.
+    /// Adapter description, e.g. `Intel(R) Wi-Fi 6 AX201 160MHz`; libpcap
+    /// rarely has one, and the name stands in.
     pub description: String,
     pub addresses: Vec<String>,
     pub is_up: bool,
@@ -33,10 +35,22 @@ impl From<&pcap::Device> for InterfaceInfo {
     }
 }
 
-/// All capture devices known to Npcap/libpcap.
+/// All network interfaces known to Npcap/libpcap.
 pub fn list_devices() -> AppResult<Vec<pcap::Device>> {
     crate::npcap::ensure_available()?;
-    Ok(pcap::Device::list()?)
+    let mut devices = pcap::Device::list()?;
+    devices.retain(|d| !(cfg!(unix) && is_pseudo(&d.name)));
+    Ok(devices)
+}
+
+/// libpcap on Linux also lists sources that are not network interfaces:
+/// `any` (every interface at once, in a framing of its own), the netfilter
+/// queues, and the USB, Bluetooth and D-Bus monitors.
+fn is_pseudo(name: &str) -> bool {
+    name == "any"
+        || ["nflog", "nfqueue", "usbmon", "bluetooth", "dbus-"]
+            .iter()
+            .any(|p| name.starts_with(p))
 }
 
 /// Find a device by its exact name.
@@ -106,4 +120,28 @@ pub fn active_devices(devices: &[pcap::Device]) -> Vec<pcap::Device> {
 
 pub fn is_loopback(d: &pcap::Device) -> bool {
     d.flags.is_loopback() || d.name.to_ascii_lowercase().contains("loopback")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_pseudo;
+
+    #[test]
+    fn capture_sources_that_are_not_interfaces() {
+        for name in [
+            "any",
+            "nflog",
+            "nfqueue",
+            "usbmon0",
+            "bluetooth-monitor",
+            "bluetooth0",
+            "dbus-system",
+            "dbus-session",
+        ] {
+            assert!(is_pseudo(name), "{name}");
+        }
+        for name in ["lo", "eth0", "enp3s0", "wlp4s0", "docker0", "anybody0"] {
+            assert!(!is_pseudo(name), "{name}");
+        }
+    }
 }

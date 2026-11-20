@@ -25,7 +25,7 @@ use std::sync::{Arc, OnceLock, Weak};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-const INSTRUCTIONS: &str = "Fishe measures this Windows PC's network traffic in real time with Npcap: \
+const INSTRUCTIONS: &str = "Fishe measures this computer's network traffic in real time: \
 a remote host, one program, or all traffic labelled by program. Start with get_status. \
 Rates are bytes per second; levels (idle/calm/busy/spike) compare traffic to its own learned normal. \
 RTT and retransmissions come from passive TCP analysis; UDP traffic has no RTT unless pinged. \

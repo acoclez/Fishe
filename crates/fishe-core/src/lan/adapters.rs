@@ -1,6 +1,6 @@
 //! The local networks this PC is on: IPv4 adapters that are up and have a
 //! default gateway, with their MAC, address and prefix (IP Helper
-//! `GetAdaptersAddresses`).
+//! `GetAdaptersAddresses` on Windows, the routing socket on Linux).
 
 use serde::Serialize;
 use std::net::Ipv4Addr;
@@ -9,10 +9,11 @@ use std::net::Ipv4Addr;
 #[serde(rename_all = "camelCase")]
 pub struct LanInterface {
     pub index: u32,
-    /// `{GUID}`, the tail of the Npcap device name `\Device\NPF_{GUID}`.
+    /// The name to open a capture on: `\Device\NPF_{GUID}` with Npcap, the
+    /// interface name (`eth0`) with libpcap.
     #[serde(skip)]
-    pub guid: String,
-    /// "Ethernet", "Wi-Fi", …
+    pub device: String,
+    /// "Ethernet", "Wi-Fi", …; on Linux the interface name.
     pub name: String,
     pub description: String,
     #[serde(skip)]
@@ -24,10 +25,6 @@ pub struct LanInterface {
 }
 
 impl LanInterface {
-    pub fn npcap_device(&self) -> String {
-        format!("\\Device\\NPF_{}", self.guid)
-    }
-
     pub fn contains(&self, ip: Ipv4Addr) -> bool {
         let mask = mask(self.prefix);
         u32::from(ip) & mask == u32::from(self.ip) & mask
@@ -68,9 +65,96 @@ pub fn sweep_hosts(iface: &LanInterface) -> (Vec<Ipv4Addr>, bool) {
 #[cfg(windows)]
 pub use win::list;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+pub use linux::list;
+
+#[cfg(not(any(windows, target_os = "linux")))]
 pub fn list() -> Vec<LanInterface> {
     Vec::new()
+}
+
+/// Put the kernel's links, addresses and default routes together: one
+/// entry per Ethernet-like interface that is up and has an IPv4 address.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn assemble(
+    links: &[crate::route::netlink::Link],
+    addresses: &[crate::route::netlink::Address],
+    routes: &[crate::route::netlink::DefaultRoute],
+    wireless: impl Fn(&str) -> bool,
+) -> Vec<LanInterface> {
+    use std::net::IpAddr;
+    let mut out: Vec<LanInterface> = links
+        .iter()
+        .filter(|l| l.up && l.ethernet && !l.loopback)
+        .filter_map(|l| {
+            let mac: [u8; 6] = l.mac.as_slice().try_into().ok()?;
+            let (ip, prefix) = addresses.iter().find_map(|a| match a.ip {
+                IpAddr::V4(ip) if a.index == l.index && !ip.is_link_local() => Some((ip, a.prefix)),
+                _ => None,
+            })?;
+            let gateway = routes
+                .iter()
+                .filter(|r| r.index == l.index)
+                .filter_map(|r| match r.gateway {
+                    IpAddr::V4(gw) => Some((r.metric, gw)),
+                    IpAddr::V6(_) => None,
+                })
+                .min()
+                .map(|(_, gw)| gw);
+            let wireless = wireless(&l.name);
+            Some(LanInterface {
+                index: l.index,
+                device: l.name.clone(),
+                name: l.name.clone(),
+                description: if wireless { "Wi-Fi" } else { "Ethernet" }.to_string(),
+                mac,
+                ip,
+                prefix,
+                gateway,
+                wireless,
+            })
+        })
+        .collect();
+    out.sort_by_key(|i| (i.gateway.is_none(), i.index));
+    out
+}
+
+#[cfg(target_os = "linux")]
+mod linux {
+    use super::*;
+    use crate::route::netlink::{
+        self, RTM_GETADDR, RTM_GETLINK, RTM_GETROUTE, RTM_NEWADDR, RTM_NEWLINK, RTM_NEWROUTE,
+    };
+
+    pub fn list() -> Vec<LanInterface> {
+        assemble(
+            &netlink::table(RTM_GETLINK, RTM_NEWLINK, netlink::link),
+            &netlink::table(RTM_GETADDR, RTM_NEWADDR, netlink::address),
+            &netlink::table(RTM_GETROUTE, RTM_NEWROUTE, netlink::default_route),
+            // The kernel gives every Wi-Fi interface this folder.
+            |name| {
+                std::path::Path::new("/sys/class/net")
+                    .join(name)
+                    .join("wireless")
+                    .exists()
+            },
+        )
+    }
+
+    #[cfg(test)]
+    mod tests {
+        #[test]
+        fn lists_this_machine() {
+            for i in super::list() {
+                println!(
+                    "{} {} {}/{} gw {:?} wifi {} {}",
+                    i.index, i.name, i.ip, i.prefix, i.gateway, i.wireless, i.device
+                );
+                assert!(i.prefix > 0 && i.prefix <= 32);
+                assert_eq!(i.name, i.device);
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -174,14 +258,13 @@ mod win {
                 let Some((ip, prefix)) = unicast else {
                     continue;
                 };
-                let guid = std::ffi::CStr::from_ptr(a.AdapterName.cast())
-                    .to_string_lossy()
-                    .into_owned();
+                // `{GUID}`, the tail of the Npcap device name.
+                let guid = std::ffi::CStr::from_ptr(a.AdapterName.cast()).to_string_lossy();
                 let mut mac = [0u8; 6];
                 mac.copy_from_slice(&a.PhysicalAddress[..6]);
                 out.push(LanInterface {
                     index: a.Anonymous1.Anonymous.IfIndex,
-                    guid,
+                    device: format!("\\Device\\NPF_{guid}"),
                     name: wide(a.FriendlyName),
                     description: wide(a.Description),
                     mac,
@@ -205,13 +288,7 @@ mod win {
             for i in super::list() {
                 println!(
                     "{} {} {}/{} gw {:?} wifi {} {}",
-                    i.index,
-                    i.name,
-                    i.ip,
-                    i.prefix,
-                    i.gateway,
-                    i.wireless,
-                    i.npcap_device()
+                    i.index, i.name, i.ip, i.prefix, i.gateway, i.wireless, i.device
                 );
                 assert!(i.prefix > 0 && i.prefix <= 32);
             }
@@ -226,7 +303,7 @@ mod tests {
     fn iface(ip: [u8; 4], prefix: u8) -> LanInterface {
         LanInterface {
             index: 1,
-            guid: String::new(),
+            device: String::new(),
             name: String::new(),
             description: String::new(),
             mac: [0; 6],
@@ -258,5 +335,65 @@ mod tests {
         assert_eq!(h.len(), 1021);
         assert!(iface([192, 168, 1, 19], 24).contains(Ipv4Addr::new(192, 168, 1, 200)));
         assert!(!iface([192, 168, 1, 19], 24).contains(Ipv4Addr::new(192, 168, 2, 1)));
+    }
+
+    #[test]
+    fn linux_tables_become_networks() {
+        use crate::route::netlink::{Address, DefaultRoute, Link};
+        let link = |index, name: &str, up, loopback| Link {
+            index,
+            name: name.into(),
+            mac: vec![2, 0, 0, 0, 0, index as u8],
+            up,
+            loopback,
+            ethernet: !loopback,
+        };
+        let addr = |index, ip: &str, prefix| Address {
+            index,
+            ip: ip.parse().unwrap(),
+            prefix,
+        };
+        let links = [
+            link(1, "lo", true, true),
+            link(2, "enp3s0", true, false),
+            link(3, "wlp4s0", true, false),
+            link(4, "docker0", true, false),
+            link(5, "enp5s0", false, false), // unplugged
+            Link {
+                mac: vec![], // a tunnel: no MAC
+                ..link(6, "tun0", true, false)
+            },
+        ];
+        let addresses = [
+            addr(1, "127.0.0.1", 8),
+            addr(2, "fe80::1", 64),
+            addr(2, "169.254.3.4", 16), // link-local: not the network's address
+            addr(2, "192.168.1.19", 24),
+            addr(3, "192.168.1.20", 24),
+            addr(4, "172.17.0.1", 16),
+            addr(5, "10.0.0.5", 24),
+            addr(6, "10.8.0.2", 24),
+        ];
+        let route = |index, gw: &str, metric| DefaultRoute {
+            gateway: gw.parse().unwrap(),
+            index,
+            metric,
+        };
+        let routes = [
+            route(3, "192.168.1.1", 600),
+            route(2, "192.168.1.254", 200), // a second gateway, less preferred
+            route(2, "192.168.1.1", 100),
+            route(2, "fe80::1", 50),
+        ];
+        let found = assemble(&links, &addresses, &routes, |name| name.starts_with("wl"));
+        let names: Vec<&str> = found.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, ["enp3s0", "wlp4s0", "docker0"], "gateways first");
+        assert_eq!(found[0].ip, Ipv4Addr::new(192, 168, 1, 19));
+        assert_eq!(found[0].gateway, Some(Ipv4Addr::new(192, 168, 1, 1)));
+        assert_eq!(found[0].device, "enp3s0");
+        assert_eq!(found[0].mac, [2, 0, 0, 0, 0, 2]);
+        assert!(found[1].wireless && !found[0].wireless);
+        assert_eq!(found[2].gateway, None);
+        assert_eq!(found[2].prefix, 16);
     }
 }

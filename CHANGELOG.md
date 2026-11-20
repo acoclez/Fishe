@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.16.0 (2026-11-20)
+
+- **Linux.** Fishe runs on Linux, from a `.deb` or `.rpm` package: capture
+  through libpcap, traffic per program, endpoint naming, connection quality,
+  ping and traceroute, the LAN scan, the route map, recordings and the MCP
+  server. Capturing takes a permission you grant once after installing; the
+  Live page shows the command. What differs from Windows is in
+  docs/linux.md.
+- The selected target (Host, Process, All) is filled like the other
+  selectors; it was only shown in bold.
+- A LAN scan stays on the Map page after a visit to another page, until the
+  next scan or until Fishe closes.
+
 ## 0.15.1 (2026-11-20)
 
 The first version with installers. 0.15.0 was published as source only; the

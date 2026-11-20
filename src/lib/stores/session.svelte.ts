@@ -37,6 +37,10 @@ class SessionController {
   /** Backend detector defaults (the gauge's zones before a session runs). */
   defaults = $state<GaugeConfig | null>(null);
   caps = $state<Capabilities | null>(null);
+  /** Linux words a few things differently (how capture is allowed, examples). */
+  get linux() {
+    return this.caps?.platform === "linux";
+  }
   /** Recording the Archive page should open (the "saved" toast's Open). */
   openRecording = $state<number | null>(null);
   /** Bumped to make the archive list reload. */

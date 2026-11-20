@@ -59,7 +59,7 @@ program or PID, see [process-mode.md](process-mode.md)).
 
 | Module | Responsibility |
 |---|---|
-| `npcap.rs` | Finds `System32\Npcap`, checks `wpcap.dll`, calls `SetDllDirectoryW`, reads `pcap_lib_version()`. Gatekeeper for every pcap call. |
+| `npcap.rs` | Can this process capture? Windows: finds `System32\Npcap`, checks `wpcap.dll`, calls `SetDllDirectoryW`. Linux: checks the `CAP_NET_RAW` capability ([linux.md](linux.md)). Reads `pcap_lib_version()`. Gatekeeper for every pcap call. |
 | `net/capture.rs` | Opens a pcap capture (`OpenCapture`): snaplen, read timeout, kernel buffer, BPF filter; used by the measuring workers, the naming sniffers and the LAN scan. |
 | `net/parse.rs` | Zero-allocation header parser: Ethernet/VLAN, DLT_NULL loopback, raw IP → IPv4/IPv6 → TCP/UDP ports. |
 | `net/interfaces.rs` | Device list; route-based pick for host mode; `active_devices` for process and all-traffic mode. |
@@ -71,8 +71,8 @@ program or PID, see [process-mode.md](process-mode.md)).
 | `monitor/packets.rs` | `PacketRing`: live packet list for the Packets view, off unless open. |
 | `monitor/quality.rs` | TCP flow tracking per worker (RTT, retransmissions) and the session / endpoint quality figures. See [connection-quality.md](connection-quality.md). |
 | `archive/*` | Recordings: SQLite store, recorder (`Accumulator` → `Sink`) and pcapng writer threads, exports. See [archive.md](archive.md). |
-| `route/*` | Traceroute and continuous ping through the Windows ICMP API, gateways, LAN neighbours. See [network-map.md](network-map.md), [connection-quality.md](connection-quality.md). |
-| `lan/*` | LAN map: adapter list (`GetAdaptersAddresses`), active ARP sweep through Npcap, MAC→vendor from the bundled IEEE list, common-port probe. See [lan-mapping.md](lan-mapping.md). |
+| `route/*` | Traceroute and continuous ping (the Windows ICMP API; a raw ICMP socket on Linux), gateways and LAN neighbours (IP Helper; the routing socket on Linux, `route/netlink.rs`). See [network-map.md](network-map.md), [connection-quality.md](connection-quality.md). |
+| `lan/*` | LAN map: adapter list (`GetAdaptersAddresses`; the routing socket on Linux), active ARP sweep through the capture library, MAC→vendor from the bundled IEEE list, common-port probe. See [lan-mapping.md](lan-mapping.md). |
 | `geo/*` | Endpoint owner & country: DB-IP Lite (offline, downloaded on request), ipinfo.io (opt-in). See [owners.md](owners.md). |
 | `monitor/target.rs` | `TargetSpec` (host / process / all), `ProcessSelector` (name / pid), `Matcher`, `Verdict` (`Match`, `Owned`, `Skip`, `Pending`). |
 | `monitor/engine.rs` | `WorkerCore` (parse, classify, hold/retry pending) and `Aggregator` (merge, tick, refresh, emit) as plain state machines, unit-tested with synthetic packets; `run` wraps them in the pcap loop, threads and UI channel. |

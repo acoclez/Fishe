@@ -247,8 +247,10 @@
     padding: 3px;
     border-radius: var(--radius);
   }
-  /* Repeats the shared border/background: the generic `button` rule below
-     has the same specificity and would otherwise win by order. */
+  /* Repeats the shared `border: 0`: the generic `button` rule below would
+     otherwise win. Background and colour are left to the shared rules in
+     app.css: a scoped rule outranks them, and setting either here would
+     hide the filled look of the selected segment. */
   .seg button {
     display: inline-flex;
     align-items: center;
@@ -256,8 +258,6 @@
     padding: 0 12px;
     border: 0;
     border-radius: 7px;
-    background: transparent;
-    color: var(--text-secondary);
   }
   .seg button svg {
     width: 14px;

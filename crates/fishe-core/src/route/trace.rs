@@ -294,7 +294,8 @@ mod tests {
         );
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg_attr(target_os = "linux", ignore = "needs CAP_NET_RAW")]
     #[test]
     fn traces_loopback_in_one_hop() {
         let t = run(

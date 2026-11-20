@@ -205,26 +205,40 @@ only gets the command that exposes it.
 
 ## Linux
 
-The desktop app is Windows-only. The core crate also builds on Linux, and
-CI keeps it that way; this is how to run the same check from Windows.
+Fishe also runs on Linux ([linux.md](linux.md) says what differs and how
+to build there). CI builds and tests both systems; this is how to run the
+Linux side from a Windows PC, in Docker.
 
 ```powershell
-npm run check:linux                                   # rustfmt, clippy, unit tests
-powershell -File scripts/linux-check.ps1 -Live        # plus four live tests
+npm run check:linux                                        # the core: rustfmt, clippy, unit tests
+powershell -File scripts/linux-check.ps1 -Live             # plus the core's live tests
+powershell -File scripts/linux-check.ps1 -App              # the whole workspace and the app binary
+powershell -File scripts/linux-check.ps1 -App -Package     # plus the .deb and .rpm, and installing the .deb
 ```
 
-The script builds a small Debian image with Rust and libpcap
-(`scripts/linux/Dockerfile`) and runs the checks in a container. The
-repository is mounted read-only and the Linux build lives in Docker volumes,
-so the Windows build in `src-tauri/target` is untouched. The container sees
-only its own traffic: enough to prove that capture, parsing, counting and
-TCP quality work on Linux, not to test the LAN scan or real adapters.
+| Switch | Image | What runs |
+|---|---|---|
+| none | `scripts/linux/Dockerfile`: Debian, Rust, libpcap | rustfmt, clippy and the unit tests of `fishe-core` |
+| `-Live` | the same | also, as root in the container: capture, TCP quality and attribution against 1.1.1.1; ICMP probe, ping and traceroute on loopback; an ARP sweep of the container's network |
+| `-App` | `scripts/linux/app.Dockerfile`: adds WebKitGTK, Node.js and a virtual display (about 2.5 GB) | `npm ci`, the Svelte check, the frontend tests, clippy and the tests of both crates, `tauri build --debug --no-bundle` |
+| `-App -Package` | the same | also the `.deb` and `.rpm` from that build, and `apt install` of the `.deb` |
 
-| The core on Linux | |
-|---|---|
-| Capture, parsing, counting, the detector, TCP quality | implemented; covered by the live tests (`-Live`) |
-| Process attribution from `/proc` ([process-mode.md](process-mode.md#on-linux)) | implemented; covered by the live tests |
-| ETW, ping and traceroute, routes and neighbours, LAN scan | Windows only; on Linux they report "not available" |
+The repository is mounted read-only. The Linux build, the crate registry
+and (for `-App`) a copy of the source with its own `node_modules` live in
+Docker volumes, so the Windows build in `src-tauri/target` and the Windows
+`node_modules` are untouched. The script's help says how to remove them.
+
+The container sees only its own virtual network: enough to prove the code
+paths, not to test Wi-Fi, several adapters, a real LAN or a desktop
+session. [linux.md](linux.md#what-was-verified) lists what was and was not
+verified this way. The app image has `xvfb`, `xdotool` and ImageMagick to
+start the built program on a virtual display and take screenshots of it:
+
+```sh
+Xvfb :99 -ac -screen 0 1280x900x24 & export DISPLAY=:99
+WEBKIT_DISABLE_COMPOSITING_MODE=1 /target/debug/fishe &
+sleep 10 && import -window root /out/window.png
+```
 
 ## Version control
 
@@ -233,8 +247,8 @@ TCP quality work on Linux, not to test the LAN scan or real adapters.
 | `.gitignore`, `src-tauri/.gitignore` | Build output, `node_modules`, the vendored Npcap SDK, IDE files, captures |
 | `.gitattributes` | LF in the repository, CRLF for PowerShell scripts, binaries marked |
 | `.editorconfig` | Indentation and line endings for editors |
-| `.github/workflows/release.yml` | On a version tag: the installers and a draft GitHub release. See [Releases](#releases) |
-| `.github/workflows/ci.yml` | On push/PR (GitHub). On `windows-latest`: Npcap SDK, `npm run check`, `npm test`, `npm run build`, `cargo fmt --all --check`, `cargo clippy --workspace -D warnings`, `cargo test --workspace`, then `tauri build --debug --no-bundle` (the real binary, no installer). On `ubuntu-latest`: clippy and the unit tests of `fishe-core` with libpcap |
+| `.github/workflows/release.yml` | On a version tag: a draft GitHub release, the Windows installers and the Linux packages. See [Releases](#releases) |
+| `.github/workflows/ci.yml` | On push/PR (GitHub). On `windows-latest`: Npcap SDK, `npm run check`, `npm test`, `npm run build`, `cargo fmt --all --check`, `cargo clippy --workspace -D warnings`, `cargo test --workspace`, then `tauri build --debug --no-bundle` (the real binary, no installer). On `ubuntu-latest`, with libpcap and WebKitGTK: `npm run build`, clippy and the tests of the workspace, and the same app build |
 
 ## Releases
 
@@ -254,8 +268,9 @@ git push; git push --tags
 | The tag must equal `v` + the version in `package.json` and `Cargo.toml` | A tag that doesn't match the files it releases |
 | `scripts/release-notes.mjs` extracts the version's `CHANGELOG.md` entry; no entry, no release | A release without notes |
 | `npm run check`, `npm test`, `cargo test --workspace --locked` | Releasing what would not pass CI, or with dependencies other than the committed `Cargo.lock` |
-| `tauri-action` builds in release mode and bundles the NSIS `.exe` and the `.msi` | |
-| The release is created as a **draft** with both installers and the notes | You look it over and press Publish; `releaseDraft: false` in the workflow publishes directly |
+| The `draft` job opens the release as a **draft** with the notes, before anything is built | Two build jobs racing to create the same release; you look it over and press Publish |
+| `build` on `windows-latest`: `tauri-action` builds in release mode and attaches the NSIS `.exe` and the `.msi` | |
+| `build` on `ubuntu-22.04`: the same, attaching the `.deb` and the `.rpm` | Built on the oldest supported Ubuntu, so the packages run there and on anything newer |
 
 The version lives in five files (`package.json`, `package-lock.json`,
 `tauri.conf.json`, the workspace `Cargo.toml` that both crates inherit
@@ -277,3 +292,6 @@ cache.
 **Not in the installers:** Npcap (users install it, the app says how) and a
 code signature. Unsigned installers work, but Windows SmartScreen warns on
 first run. There is no in-app updater: a new version is a new download.
+
+**Not done by the Linux packages:** granting the capture permission. The
+app shows the command and the user runs it ([linux.md](linux.md#the-capture-permission)).

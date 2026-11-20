@@ -1,4 +1,8 @@
-//! Npcap runtime discovery.
+//! Can this process capture? On Windows that means finding the Npcap
+//! runtime; on Linux, where libpcap is a normal library, it means holding
+//! the permission to open a capture (see [`may_capture`]).
+//!
+//! ## Windows: Npcap runtime discovery
 //!
 //! `wpcap.dll` is delay-loaded (see `build.rs`). Before *any* pcap function is
 //! called we must:
@@ -16,6 +20,15 @@
 //! then shows how to install it and calls [`recheck`] afterwards: nothing
 //! was loaded by a failed probe, so looking again is safe and no restart is
 //! needed.
+//!
+//! ## Linux: the capture permission
+//!
+//! Opening a capture (and the raw ICMP socket ping and traceroute use) needs
+//! the `CAP_NET_RAW` capability, which root has and ordinary programs do
+//! not. Fishe never raises its own rights: when the capability is missing
+//! the status carries the one command that grants it to this executable
+//! ([`NpcapStatus::grant_command`]), for the user to run. A capability is
+//! read when a program starts, so it takes effect at the next launch.
 
 use serde::Serialize;
 use std::sync::Mutex;
@@ -30,12 +43,16 @@ pub const DOWNLOAD_URL: &str = "https://npcap.com/#download";
 pub struct NpcapStatus {
     /// `true` when pcap functions can safely be called.
     pub available: bool,
-    /// Folder the DLLs were loaded from (Windows only).
+    /// Folder the Npcap DLLs were loaded from (Windows).
     pub dll_dir: Option<String>,
     /// Version string reported by `pcap_lib_version()`.
     pub version: Option<String>,
     /// Human-readable explanation when unavailable.
     pub message: Option<String>,
+    /// Linux, when capturing is not permitted: the command that grants this
+    /// executable the permission. `None` when no command can (the file sits
+    /// where capabilities do not apply).
+    pub grant_command: Option<String>,
 }
 
 static STATUS: Mutex<Option<NpcapStatus>> = Mutex::new(None);
@@ -107,18 +124,68 @@ fn probe_dir(dir: &std::path::Path) -> NpcapStatus {
         dll_dir: Some(dir_str),
         version: lib_version(),
         message: None,
+        grant_command: None,
     }
 }
 
 #[cfg(not(windows))]
 fn probe() -> NpcapStatus {
-    // On Unix the system libpcap is linked normally.
+    // The system libpcap is linked normally; what can be missing is the
+    // right to use it.
+    #[cfg(target_os = "linux")]
+    if !may_capture(&std::fs::read_to_string("/proc/self/status").unwrap_or_default()) {
+        return NpcapStatus {
+            available: false,
+            dll_dir: None,
+            version: None,
+            message: Some(
+                "Fishe is not allowed to capture packets: it needs the CAP_NET_RAW capability (or to run as root)."
+                    .into(),
+            ),
+            grant_command: std::env::current_exe()
+                .ok()
+                .and_then(|exe| grant_command(&exe.to_string_lossy())),
+        };
+    }
     NpcapStatus {
         available: true,
         dll_dir: None,
         version: lib_version(),
         message: None,
+        grant_command: None,
     }
+}
+
+/// Does `/proc/self/status` show `CAP_NET_RAW` among the effective
+/// capabilities? Root has it; so does an executable it was granted to.
+/// When the file cannot be read as expected the answer is yes: opening the
+/// capture will then say what is wrong.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn may_capture(proc_status: &str) -> bool {
+    const CAP_NET_RAW: u32 = 13;
+    proc_status
+        .lines()
+        .find_map(|l| l.strip_prefix("CapEff:"))
+        .and_then(|hex| u64::from_str_radix(hex.trim(), 16).ok())
+        .is_none_or(|caps| caps & (1 << CAP_NET_RAW) != 0)
+}
+
+/// The command that lets `exe` capture without being root. `None` for a
+/// file inside a mounted AppImage (a read-only image: capabilities cannot be
+/// set there) and for a path that cannot be quoted safely.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn grant_command(exe: &str) -> Option<String> {
+    if exe.is_empty() || exe.contains(['\'', '\n']) || exe.contains("/.mount_") {
+        return None;
+    }
+    let plain = exe
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "/._-+".contains(c));
+    Some(if plain {
+        format!("sudo setcap cap_net_raw=ep {exe}")
+    } else {
+        format!("sudo setcap cap_net_raw=ep '{exe}'")
+    })
 }
 
 #[cfg(windows)]
@@ -128,6 +195,7 @@ fn unavailable(dir: Option<String>, msg: &str) -> NpcapStatus {
         dll_dir: dir,
         version: None,
         message: Some(msg.to_string()),
+        grant_command: None,
     }
 }
 
@@ -160,6 +228,52 @@ impl EncodeWideNul for std::ffi::OsStr {
     fn encode_wide_nul(&self) -> Vec<u16> {
         use std::os::windows::ffi::OsStrExt;
         self.encode_wide().chain(std::iter::once(0)).collect()
+    }
+}
+
+#[cfg(test)]
+mod permission_tests {
+    use super::*;
+
+    #[test]
+    fn the_capture_capability_is_read_from_proc_status() {
+        let status = |caps: &str| {
+            format!("Name:\tfishe\nCapPrm:\t{caps}\nCapEff:\t{caps}\nCapBnd:\t000001ffffffffff\n")
+        };
+        assert!(may_capture(&status("000001ffffffffff")), "root");
+        assert!(
+            may_capture(&status("0000000000002000")),
+            "granted to the file"
+        );
+        assert!(
+            !may_capture(&status("0000000000000000")),
+            "an ordinary program"
+        );
+        assert!(
+            !may_capture(&status("0000000000001000")),
+            "CAP_NET_ADMIN alone is not it"
+        );
+        // Unreadable: do not claim it is forbidden.
+        assert!(may_capture(""));
+        assert!(may_capture("CapEff:\tnot-hex\n"));
+    }
+
+    #[test]
+    fn the_grant_command_names_this_executable() {
+        assert_eq!(
+            grant_command("/usr/bin/fishe").as_deref(),
+            Some("sudo setcap cap_net_raw=ep /usr/bin/fishe")
+        );
+        assert_eq!(
+            grant_command("/home/ada/My Apps/fishe").as_deref(),
+            Some("sudo setcap cap_net_raw=ep '/home/ada/My Apps/fishe'")
+        );
+        // Nothing a shell could read as more than one argument.
+        assert_eq!(grant_command("/tmp/it's/fishe"), None);
+        assert_eq!(grant_command("/tmp/a\nb/fishe"), None);
+        // An AppImage is mounted read-only for each run.
+        assert_eq!(grant_command("/tmp/.mount_FisheAbC123/usr/bin/fishe"), None);
+        assert_eq!(grant_command(""), None);
     }
 }
 

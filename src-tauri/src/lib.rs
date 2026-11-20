@@ -114,12 +114,12 @@ pub fn run() {
     let status = npcap::init();
     if status.available {
         log::info!(
-            "Npcap ready: {}",
+            "capture ready: {}",
             status.version.as_deref().unwrap_or("unknown version")
         );
     } else {
         log::warn!(
-            "Npcap unavailable: {}",
+            "capture unavailable: {}",
             status.message.as_deref().unwrap_or("-")
         );
     }

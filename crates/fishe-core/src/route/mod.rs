@@ -1,11 +1,13 @@
 //! Routes: which routers sit between this machine and an endpoint.
 //!
-//! - [`icmp`]: one ICMP echo probe with a chosen TTL through the Windows
-//!   ICMP API (`IcmpSendEcho` / `Icmp6SendEcho2`, no admin rights). A router
-//!   that drops the probe because its TTL ran out answers "time exceeded",
-//!   revealing itself; the destination answers the echo.
+//! - [`icmp`]: one ICMP echo probe with a chosen TTL, through the Windows
+//!   ICMP API (`IcmpSendEcho` / `Icmp6SendEcho2`, no admin rights) or a raw
+//!   ICMP socket on Linux. A router that drops the probe because its TTL
+//!   ran out answers "time exceeded", revealing itself; the destination
+//!   answers the echo.
 //! - [`trace`]: a traceroute built from those probes, TTLs probed in parallel.
-//! - [`lan`]: default gateways and the neighbour (ARP/NDP) table.
+//! - [`lan`]: default gateways and the neighbour (ARP/NDP) table, from the
+//!   IP Helper API on Windows and from [`netlink`] on Linux.
 //! - [`ping`]: continuous ping (1/s) for RTT, jitter and loss.
 //!
 //! Traceroutes and pings send real packets, so they only run when the UI asks.
@@ -13,6 +15,7 @@
 
 pub mod icmp;
 pub mod lan;
+pub mod netlink;
 pub mod ping;
 pub mod trace;
 

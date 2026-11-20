@@ -47,7 +47,7 @@ use target::{Matcher, ProcessSelector, TargetSpec};
 #[serde(rename_all = "camelCase")]
 pub struct StartRequest {
     pub target: TargetSpec,
-    /// Npcap device name. `None`: host mode picks the route's interface,
+    /// Capture device name. `None`: host mode picks the route's interface,
     /// process mode captures on every active interface.
     #[serde(default)]
     pub interface: Option<String>,

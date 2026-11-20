@@ -10,7 +10,7 @@ pub type AppResult<T> = Result<T, AppError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("Npcap is not available: {0}")]
+    #[error("capture is not available: {0}")]
     NpcapUnavailable(String),
 
     #[error("\"{0}\" is not a valid IP address or resolvable host name")]
@@ -45,7 +45,7 @@ pub enum AppError {
     Busy(String),
 
     /// A feature this build or machine doesn't offer (no owner database,
-    /// process mode off Windows).
+    /// process mode on a system other than Windows and Linux).
     #[error("{0}")]
     Unavailable(String),
 

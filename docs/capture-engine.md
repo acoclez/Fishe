@@ -52,6 +52,11 @@ downloads the SDK there.
 Administrators only"* option is off (the default, registry `AdminOnly = 0`).
 If it is on, run Fishe as administrator.
 
+**On Linux** there is nothing to find: libpcap is an ordinary library the
+packages depend on. What can be missing is the right to open a capture,
+and `npcap::init()` checks that instead; the Live page then shows the
+command that grants it. See [linux.md](linux.md).
+
 ## 2. Choosing the interface (`net/interfaces.rs`)
 
 **Process mode** captures on every *active* interface at once (up, running,

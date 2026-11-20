@@ -7,6 +7,7 @@
    * including future ones. Expanding a group lets you bind to one PID.
    */
   import { api, errorMessage } from "#lib/api/index.ts";
+  import { session } from "#lib/stores/session.svelte.ts";
   import { settings } from "#lib/stores/settings.svelte.ts";
   import type { ProcessGroup, ProcessSelector } from "#lib/api/types.ts";
 
@@ -118,7 +119,7 @@
     onfocus={openList}
     onclick={openList}
     onkeydown={onKey}
-    placeholder="Search a running program, e.g. chrome.exe"
+    placeholder={session.linux ? "Search a running program, e.g. firefox" : "Search a running program, e.g. chrome.exe"}
     role="combobox"
     aria-expanded={open}
     aria-controls="process-list"

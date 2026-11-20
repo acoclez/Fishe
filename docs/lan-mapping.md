@@ -13,7 +13,7 @@ previous set all at once; nothing on the page updates on its own.
 
 For every local IPv4 network that has a default gateway (`lan::adapters`):
 
-1. **ARP sweep** (`lan::arp`). Through Npcap, Fishe broadcasts an ARP
+1. **ARP sweep** (`lan::arp`). Through Npcap (libpcap on Linux), Fishe broadcasts an ARP
    "who has `<ip>`?" for each address of the network and collects the
    replies. Devices that are switched on answer with their MAC; devices
    that are asleep or firewalled against ARP do not (nothing short of ARP
@@ -57,8 +57,9 @@ A scan only ever touches the local network segment this PC is already on
 (the subnet of an adapter with a gateway), and only with ARP, reverse DNS
 and short-lived TCP connections to well-known ports — the ordinary traffic
 of being a device on that network. It sends nothing to the internet and
-changes nothing on the devices it finds. Nothing is stored; results live
-only in the open window until the next scan.
+changes nothing on the devices it finds. Nothing is stored: the last result is
+kept in memory until the next scan or until the app closes, so it is still
+there after a visit to another page.
 
 ## Where it lives
 

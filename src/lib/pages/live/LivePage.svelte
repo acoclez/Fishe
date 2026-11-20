@@ -1,5 +1,6 @@
 <script lang="ts">
   /** Live: the target bar, the gauge and tiles, the chart, quality, the busiest few, protocols and ports. */
+  import CaptureRights from "#lib/pages/live/CaptureRights.svelte";
   import FocusBar from "#lib/components/FocusBar.svelte";
   import Gauge from "#lib/pages/live/Gauge.svelte";
   import LevelBadge from "#lib/components/LevelBadge.svelte";
@@ -22,7 +23,9 @@
   const view = $derived(session.view);
 </script>
 
-{#if session.npcap && !session.npcap.available}<NpcapMissing />{/if}
+{#if session.npcap && !session.npcap.available}
+  {#if session.linux}<CaptureRights />{:else}<NpcapMissing />{/if}
+{/if}
 
 <TargetForm
   interfaces={session.interfaces}

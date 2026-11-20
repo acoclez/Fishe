@@ -1,4 +1,4 @@
-//! ARP sweep through Npcap: broadcast "who has <ip>?" for every address of
+//! ARP sweep through the capture library: broadcast "who has <ip>?" for every address of
 //! the network and collect the replies. A /24 takes about 2 s, far faster
 //! than `SendARP` (which waits ~3 s per silent address), and every ARP
 //! packet seen meanwhile, replies or other devices' own requests, counts.
@@ -52,7 +52,7 @@ pub fn sender(frame: &[u8]) -> Option<(Ipv4Addr, [u8; 6])> {
 pub fn sweep(iface: &LanInterface, hosts: &[Ipv4Addr]) -> AppResult<Vec<(Ipv4Addr, [u8; 6])>> {
     crate::npcap::ensure_available()?;
     let mut cap = crate::net::capture::bounded(
-        Capture::from_device(iface.npcap_device().as_str())?
+        Capture::from_device(iface.device.as_str())?
             .promisc(false)
             .snaplen(64)
             .timeout(30)

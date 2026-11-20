@@ -25,7 +25,7 @@ in captured traffic. Fishe uses two sources:
 | How | Remaining TTL / hop limit of received packets: senders start at 32, 64, 128 or 255, each router subtracts 1 | ICMP echo probes with TTL 1, 2, 3…: each router that drops a probe answers "time exceeded" |
 | Network use | none | 2 small probes per hop (like `tracert`) |
 | When | always (Hops column `~N`) | only when you click **Trace** |
-| Admin | no | no (Windows ICMP API: `IcmpSendEcho`, `Icmp6SendEcho2`) |
+| Admin | no | no (Windows ICMP API: `IcmpSendEcho`, `Icmp6SendEcho2`). On Linux: a raw ICMP socket, with the capture permission ([linux.md](linux.md)) |
 
 ### Traceroute details (`route/trace.rs`)
 

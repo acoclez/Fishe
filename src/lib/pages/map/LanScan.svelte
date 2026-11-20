@@ -5,17 +5,18 @@
    * A scan is a one-shot action (it sends ARP requests and, optionally, probes
    * a few common ports), so results replace the previous set atomically — the
    * list and the map are drawn once per scan and never reflow on their own.
+   * The result is kept in the `lan` store, so leaving the page does not lose it.
    */
-  import { api, errorMessage } from "#lib/api/index.ts";
+  import { lan } from "#lib/stores/lan.svelte.ts";
   import { nav } from "#lib/stores/nav.svelte.ts";
   import { session } from "#lib/stores/session.svelte.ts";
   import { settings } from "#lib/stores/settings.svelte.ts";
-  import type { LanDevice, LanNetwork, LanScan } from "#lib/api/types.ts";
+  import type { LanDevice, LanNetwork } from "#lib/api/types.ts";
 
-  let scanning = $state(false);
-  let result = $state<LanScan | null>(null);
-  let error = $state<string | null>(null);
-  let view = $state<"list" | "map">("list");
+  const scanning = $derived(lan.scanning);
+  const result = $derived(lan.result);
+  const error = $derived(lan.error);
+  const view = $derived(lan.view);
   let hover = $state<string | null>(null);
   const hoverDev = $derived.by(() => {
     if (!hover || !result) return null;
@@ -26,23 +27,12 @@
     return null;
   });
 
-  /** The sweep sends ARP through Npcap: without it there is nothing to press. */
+  /** The sweep sends ARP through the capture library: without it there is nothing to press. */
   const noCapture = $derived(session.npcap !== null && !session.npcap.available);
 
   const deviceCount = $derived(result ? result.networks.reduce((n, net) => n + net.devices.length, 0) : 0);
 
-  async function scan() {
-    if (scanning) return;
-    scanning = true;
-    error = null;
-    try {
-      result = await api.scanLan(settings.lanProbePorts);
-    } catch (err) {
-      error = errorMessage(err);
-    } finally {
-      scanning = false;
-    }
-  }
+  const scan = () => lan.scan(settings.lanProbePorts);
 
   function label(d: LanDevice): string {
     if (d.hostname) return d.hostname;
@@ -75,16 +65,21 @@
     <span class="spacer"></span>
     {#if result}
       <div class="viewtoggle" role="group" aria-label="View">
-        <button type="button" class:on={view === "list"} onclick={() => (view = "list")}>List</button>
-        <button type="button" class:on={view === "map"} onclick={() => (view = "map")}>Map</button>
+        <button type="button" class:on={view === "list"} onclick={() => (lan.view = "list")}>List</button>
+        <button type="button" class:on={view === "map"} onclick={() => (lan.view = "map")}>Map</button>
       </div>
     {/if}
   </div>
 
   <p class="status">
     {#if noCapture}
-      Scanning needs Npcap, which isn't installed yet.
-      <button type="button" class="link" onclick={() => nav.go("live")}>See how to install it</button>
+      {#if session.linux}
+        Scanning needs the permission to capture packets.
+        <button type="button" class="link" onclick={() => nav.go("live")}>See how to grant it</button>
+      {:else}
+        Scanning needs Npcap, which isn't installed yet.
+        <button type="button" class="link" onclick={() => nav.go("live")}>See how to install it</button>
+      {/if}
     {:else if error}
       <span class="err">{error}</span>
     {:else if scanning}
@@ -112,7 +107,7 @@
         <rect x="33" y="28" width="12" height="9" rx="2" />
         <path d="M24 12v8M9 28v-8h30v8M24 20v8" />
       </svg>
-      <p>{#if noCapture}Install Npcap to scan your network.{:else}No scan yet. Press <b>Scan network</b> to see what's connected.{/if}</p>
+      <p>{#if noCapture}{session.linux ? "Allow Fishe to capture to scan your network." : "Install Npcap to scan your network."}{:else}No scan yet. Press <b>Scan network</b> to see what's connected.{/if}</p>
     </div>
   {/if}
 </div>

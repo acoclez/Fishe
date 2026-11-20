@@ -1,6 +1,7 @@
 //! Where Fishe keeps its files. One root, decided once at startup:
 //! `FISHE_DATA_DIR` when set (test builds, see `docs/development.md`), else
-//! the per-user app data folder (`%APPDATA%\com.fishe.app`).
+//! the per-user app data folder (`%APPDATA%\com.fishe.app` on Windows,
+//! `~/.local/share/com.fishe.app` on Linux).
 //!
 //! ```text
 //! <root>/archive/fishe.db, captures/*.pcapng   recordings   (archive)
@@ -35,12 +36,20 @@ impl Paths {
     }
 
     /// For processes without a Tauri app handle (the stdio bridge): the same
-    /// folder Tauri's `app_data_dir()` resolves to on Windows.
+    /// folder Tauri's `app_data_dir()` resolves to.
     pub fn from_env_or_default() -> Self {
-        let base = std::env::var_os("APPDATA")
-            .map(PathBuf::from)
-            .unwrap_or_default();
-        Self::from_env_or(base.join(IDENTIFIER))
+        let var = |name| std::env::var_os(name).filter(|v| !v.is_empty());
+        let base = if cfg!(windows) {
+            var("APPDATA").map(PathBuf::from)
+        } else {
+            // The XDG base directory rule: an absolute $XDG_DATA_HOME, else
+            // ~/.local/share.
+            var("XDG_DATA_HOME")
+                .map(PathBuf::from)
+                .filter(|p| p.is_absolute())
+                .or_else(|| var("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+        };
+        Self::from_env_or(base.unwrap_or_default().join(IDENTIFIER))
     }
 
     pub fn root(&self) -> &Path {

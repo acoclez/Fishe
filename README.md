@@ -1,6 +1,6 @@
 # Fishe
 
-A real-time network traffic monitor for Windows. Fishe measures the traffic
+A real-time network traffic monitor for Windows and Linux. Fishe measures the traffic
 of a remote host, of one program, or of the whole machine, shows when it is
 busier than usual, and tells you where it goes and how well the connections
 behave. It observes only: it never blocks or changes anything on the
@@ -36,15 +36,30 @@ network.
 
 ## Requirements
 
+**Windows**
+
 - Windows 10 or 11, 64-bit.
 - [Npcap](https://npcap.com), installed with its default options. It is not
   bundled; Fishe shows how to install it when it is missing.
 
+**Linux**
+
+- A 64-bit desktop with WebKitGTK 4.1: Ubuntu 22.04 or later, Debian 12 or
+  later, Fedora and others of that age. The packages pull in what they need.
+- The permission to capture packets, which you grant once after installing;
+  Fishe shows the command. See [docs/linux.md](docs/linux.md).
+
 ## Install
 
-Download the installer of the latest version from the **Releases** page and
-run it. The installers are not code-signed, so Windows SmartScreen asks for
-confirmation on first run.
+Download the file for your system from the **Releases** page.
+
+- **Windows:** run the `.exe` or `.msi` installer. The installers are not
+  code-signed, so Windows SmartScreen asks for confirmation on first run.
+- **Debian, Ubuntu:** `sudo apt install ./Fishe_<version>_amd64.deb`
+- **Fedora:** `sudo dnf install ./Fishe-<version>-1.x86_64.rpm`
+
+On Linux, start Fishe and follow the prompt on the Live page: one `setcap`
+command lets it capture without running as root.
 
 ## Usage
 
@@ -92,7 +107,7 @@ a token. See [docs/mcp.md](docs/mcp.md).
 
 ## Build from source
 
-Requires Rust (stable, MSVC), Node.js 22.17 or later, and Npcap.
+On Windows: Rust (stable, MSVC), Node.js 22.17 or later, and Npcap.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup-npcap-sdk.ps1
@@ -100,7 +115,16 @@ npm install
 npm run tauri dev
 ```
 
-`npm run tauri build` produces the installers. See
+On Linux: Rust (stable), Node.js 22.17 or later, and the development
+packages of libpcap and WebKitGTK (the list is in
+[docs/linux.md](docs/linux.md#building)).
+
+```sh
+npm install
+npm run tauri dev
+```
+
+`npm run tauri build` produces the installers or packages. See
 [docs/development.md](docs/development.md) for tests, the workspace layout
 and the release process.
 
@@ -122,12 +146,14 @@ and the release process.
 | [mcp.md](docs/mcp.md) | The MCP server: setup, tools, security |
 | [ipc-api.md](docs/ipc-api.md) | Commands, events and types between the window and the backend |
 | [frontend.md](docs/frontend.md) | Structure of the Svelte interface |
+| [linux.md](docs/linux.md) | Fishe on Linux: the capture permission, what differs, what was verified |
 | [development.md](docs/development.md) | Setup, tests, building, releases |
 
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
 
-Fishe uses [Npcap](https://npcap.com) for packet capture and the
+Fishe uses [Npcap](https://npcap.com) (Windows) or
+[libpcap](https://www.tcpdump.org) (Linux) for packet capture and the
 [DB-IP Lite](https://db-ip.com) database for owner and country data
 (CC BY 4.0).

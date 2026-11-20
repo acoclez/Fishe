@@ -33,7 +33,7 @@ interface AppError { code: string; message: string }
 
 | `code` | Meaning |
 |---|---|
-| `npcap_unavailable` | Npcap runtime not found or failed to load |
+| `npcap_unavailable` | Capture is not possible: Npcap not found (Windows), or no permission to capture (Linux) |
 | `invalid_target` | Not an IP / resolvable host name, or an empty program name |
 | `interface_not_found` | The requested device name doesn't exist |
 | `no_route` | No usable interface (to the host, or none active in process mode) |
@@ -43,7 +43,7 @@ interface AppError { code: string; message: string }
 | `invalid_argument` | Input out of range or not allowed (recording name length, a path outside the archive) |
 | `invalid_state` | Right request, wrong moment: recording with no session running, deleting a recording still being written |
 | `busy` | Limit reached or resource in use: a recording already running, five pings at once |
-| `unavailable` | Not offered here: owner database not installed, process mode off Windows |
+| `unavailable` | Not offered here: owner database not installed, process mode on a system other than Windows and Linux |
 | `io` | File or network I/O failed; the message says what was being done |
 | `internal` | Anything else (thread spawn, OS query failure, archive database) |
 
@@ -55,9 +55,9 @@ both through to agents).
 | Command | Args | Returns | Notes |
 |---|---|---|---|
 | `npcap_status` | none | `NpcapStatus` | Cached result of startup probing |
-| `npcap_recheck` | none | `NpcapStatus` | Probes again if Npcap was not found (installed while the app runs); a found Npcap stays found |
-| `open_npcap_site` | none | none | Opens `https://npcap.com/#download` in the default browser; the address is fixed |
-| `system_capabilities` | none | `Capabilities` | Process mode available? Elevated? ETW? |
+| `npcap_recheck` | none | `NpcapStatus` | Probes again if Npcap was not found (installed while the app runs); a found Npcap stays found. On Linux the answer only changes at the next start |
+| `open_npcap_site` | none | none | Opens `https://npcap.com/#download` in the default browser; the address is fixed. Does nothing on Linux |
+| `system_capabilities` | none | `Capabilities` | `platform` (`"windows"`, `"linux"`, `"other"`), process mode available, elevated (administrator or root), ETW |
 | `default_gauge_config` | none | `GaugeConfig` | Backend defaults |
 | `list_interfaces` | none | `InterfaceInfo[]` | All Npcap devices |
 | `list_processes` | none | `ProcessGroup[]` | Grouped by executable, busiest first |
@@ -338,7 +338,13 @@ interface LanDevice { ip; mac: string | null; vendor: string | null; hostname: s
 interface Owner { asn: number | null; org: string | null; country: string | null /* ISO alpha-2 */; source: "dbip" | "ipinfo" }
 interface GeoStatus { installed; hasAsn; hasCountry; month: string | null; builtAt: number | null; downloadedAt: number | null;
                       currentMonth: string; updateAvailable: boolean; bytes: number; onlineEnabled: boolean; attribution: string; dir: string }
-interface NpcapStatus { available: boolean; dllDir: string | null; version: string | null; message: string | null }
+interface NpcapStatus {
+  available: boolean;
+  dllDir: string | null;          // Windows: where Npcap was found or looked for
+  version: string | null;
+  message: string | null;
+  grantCommand: string | null;    // Linux, not allowed to capture: the setcap command for this executable
+}
 interface InterfaceInfo { name; description; addresses: string[]; isUp; isRunning; isLoopback; isWireless }
 interface ResolvedTarget { input; ip; fromHostname: boolean; candidates: string[] }
 interface GaugeConfig { busyRatio; spikeRatio; idleFloorBps; baselineFloorBps;
