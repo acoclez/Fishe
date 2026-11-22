@@ -106,6 +106,14 @@ export const commands = {
 	 *  Sends packets, so it runs only when the user asks.
 	 */
 	scanLan: (probePorts: boolean) => __TAURI_INVOKE<LanScan>("scan_lan", { probePorts }),
+	/**  Forget the devices remembered from LAN scans (`lan.json`). */
+	lanForget: () => __TAURI_INVOKE<null>("lan_forget"),
+	/**
+	 *  The security view: what the running all-traffic session saw, the
+	 *  programs accepting connections, the local networks scanned so far, and
+	 *  the findings derived from them. Reads; sends nothing.
+	 */
+	securityReport: () => __TAURI_INVOKE<SecurityReport>("security_report"),
 	/**
 	 *  Receive every monitor event (sessions, samples, recordings) from now on,
 	 *  whoever starts them. Called once when the window mounts; a running
@@ -180,12 +188,54 @@ export type CaptureInterface = {
 	linkType: number,
 };
 
+/**  How sure the port makes us that the content is unencrypted. */
+export type Certainty = 
+/**  The protocol can upgrade to TLS; the headers do not show whether it did. */
+"maybe" | "yes" | 
+/**  Unencrypted, and the protocol carries logins or commands. */
+"credentials";
+
 /**  Byte/packet counters for both directions. */
 export type Counters = {
 	bytesIn: number,
 	bytesOut: number,
 	packetsIn: number,
 	packetsOut: number,
+};
+
+/**  A DHCP server whose answers went by during the session. */
+export type DhcpSeen = {
+	/**  The interface it was heard on. */
+	interface: string,
+	server: string,
+	mac: string | null,
+	vendor: string | null,
+	/**  Offers and acknowledgements seen. */
+	replies: number,
+	/**  The gateway and DNS servers it hands out. */
+	router: string | null,
+	dns: string[],
+};
+
+/**  A DHCP server that answered, with what it hands out. */
+export type DhcpServer = {
+	/**
+	 *  The server's own address (its "server identifier", or where the
+	 *  offer came from when it gave none).
+	 */
+	ip: string,
+	/**  "aa:bb:cc:dd:ee:ff" */
+	mac: string | null,
+	vendor: string | null,
+	/**  The address it offered this PC. */
+	offered: string | null,
+	/**  The gateway it tells devices to use. */
+	router: string | null,
+	/**  The DNS servers it tells devices to use. */
+	dns: string[],
+	leaseSecs: number | null,
+	/**  It is this network's gateway (the usual case at home). */
+	isGateway: boolean,
 };
 
 /**
@@ -196,6 +246,32 @@ export type Counters = {
  *  - All-traffic mode: `In` = received by this machine, `Out` = sent by it.
  */
 export type Direction = "in" | "out";
+
+export type DnsAudit = {
+	/**  Servers asked in clear text (UDP port 53), busiest first. */
+	servers: DnsServer[],
+	/**  Servers reached on the DNS-over-TLS port. */
+	overTls: EndpointRef[],
+	/**  Connections to known DNS-over-HTTPS hosts. */
+	overHttps: EndpointRef[],
+};
+
+/**  One DNS server's figures. */
+export type DnsServer = {
+	ip: string,
+	name: string | null,
+	scope: AddrScope,
+	owner: Owner | null,
+	queries: number,
+	answered: number,
+	unanswered: number,
+	/**  "No such name" answers (normal). */
+	nxdomain: number,
+	/**  Answers saying the server could not or would not resolve. */
+	failed: number,
+	avgMs: number | null,
+	maxMs: number | null,
+};
 
 export type EndpointPort = {
 	transport: Transport,
@@ -237,6 +313,14 @@ export type EndpointRecord = {
 	owner: Owner | null,
 	/**  TCP connection quality over the recording. */
 	quality: EndpointQuality | null,
+};
+
+/**  A remote address with what is known about it. */
+export type EndpointRef = {
+	ip: string,
+	name: string | null,
+	scope: AddrScope,
+	bytes: number,
 };
 
 /**  One endpoint as sent to the UI. */
@@ -290,6 +374,48 @@ export type ExportFormat =
 "endpointsCsv" | 
 /**  Everything: summary, session, samples, endpoints, episodes. */
 "json";
+
+/**  Something worth attention, with the reason. */
+export type Finding = {
+	/**  Stable while the finding stands, so a list can keep its rows still. */
+	id: string,
+	severity: Severity,
+	kind: FindingKind,
+	/**  What was seen, in one line. */
+	title: string,
+	/**  Why it matters and what it does not prove. */
+	detail: string,
+	program: string | null,
+	/**  The endpoints, ports or devices concerned (a few of them). */
+	subjects: string[],
+};
+
+export type FindingKind = 
+/**  A program used a service that is not encrypted. */
+"plaintext" | 
+/**  A program offered nothing newer than an outdated TLS version. */
+"oldTls" | 
+/**  One address tried many ports of this machine. */
+"portScan" | 
+/**  A program accepted a connection from the Internet. */
+"inboundAccepted" | 
+/**
+ *  A remote-access, file-sharing or database service accepts
+ *  connections from other machines.
+ */
+"sensitiveListener" | 
+/**  A DNS server fails or does not answer much of the time. */
+"dnsFailures" | 
+/**  DNS questions travel unencrypted to a server on the Internet. */
+"dnsUnencrypted" | 
+/**  The gateway's hardware address is not the one seen before. */
+"gatewayChanged" | 
+/**  A device joined the local network since the previous scan. */
+"newDevice" | 
+/**  More than one DHCP server answers on a network. */
+"secondDhcpServer" | 
+/**  A VPN is up, and something leaves this machine outside it. */
+"vpnOutside";
 
 export type Gateway = {
 	ip: string,
@@ -387,6 +513,28 @@ export type HopStatus =
 /**  No answer to any probe. */
 "silent";
 
+/**  What one remote address tried against this machine. */
+export type InboundPeer = {
+	ip: string,
+	name: string | null,
+	scope: AddrScope,
+	owner: Owner | null,
+	/**  Distinct local ports tried. */
+	portCount: number,
+	/**  The first few, lowest first. */
+	ports: number[],
+	/**  Connection requests received. */
+	attempts: number,
+	/**  Requests this machine accepted. */
+	accepted: number,
+	/**  Ports on which it was accepted. */
+	acceptedPorts: number[],
+	/**  Many ports tried: looks like a scan. */
+	scan: boolean,
+	/**  Session time of the latest attempt. */
+	lastMs: number,
+};
+
 /**  A capture interface as shown in the UI. */
 export type InterfaceInfo = {
 	/**
@@ -406,6 +554,29 @@ export type InterfaceInfo = {
 	isWireless: boolean,
 };
 
+/**  One local network Fishe has scanned. */
+export type KnownLan = {
+	/**  "192.168.1.0/24" */
+	network: string,
+	gateway: string | null,
+	gatewayMac: string | null,
+	/**  Devices ever seen on it. */
+	devices: number,
+	scans: number,
+	/**  Unix ms. */
+	firstScan: number,
+	lastScan: number,
+	/**  First seen in the latest scan. */
+	newDevices: NewDevice[],
+	/**
+	 *  The gateway answered with another hardware address in the latest
+	 *  scan than in the one before: the address it had.
+	 */
+	gatewayWas: string | null,
+	/**  The DHCP servers that answered in the latest scan. */
+	dhcp: DhcpServer[],
+};
+
 /**  A device discovered on the LAN. */
 export type LanDevice = {
 	ip: string,
@@ -420,6 +591,13 @@ export type LanDevice = {
 	isGateway: boolean,
 	/**  This PC itself. */
 	isSelf: boolean,
+	/**
+	 *  Not seen in earlier scans of this network (never set on the first
+	 *  scan of a network, when everything is new).
+	 */
+	isNew: boolean,
+	/**  When a scan first saw this device (Unix ms). */
+	firstSeen: number | null,
 	ports: OpenPort[],
 };
 
@@ -436,6 +614,11 @@ export type LanNetwork = {
 	/**  A network larger than a /22 was swept around this PC's own /24. */
 	narrowed: boolean,
 	devices: LanDevice[],
+	/**
+	 *  The DHCP servers that answered on this network. More than one is
+	 *  worth a look.
+	 */
+	dhcp: DhcpServer[],
 };
 
 export type LanScan = {
@@ -448,6 +631,20 @@ export type LanScan = {
 
 /**  Busyness level shown by the UI. Ordered: idle < calm < busy < spike. */
 export type Level = "idle" | "calm" | "busy" | "spike";
+
+/**  A program accepting TCP connections. */
+export type Listener = {
+	program: string,
+	pid: number,
+	port: number,
+	reach: Reach,
+	/**  "all addresses", or the addresses it is bound to. */
+	address: string,
+	/**  What usually runs on that port, when the number is well known. */
+	service: string | null,
+	/**  Remote access, file sharing or a database, reachable from the network. */
+	sensitive: boolean,
+};
 
 /**  What agents may do. Each level includes the ones before it. */
 export type McpAccess = 
@@ -550,6 +747,14 @@ export type NetContext = {
 	neighbors: Neighbor[],
 };
 
+/**  A device first seen in the latest scan of a network already known. */
+export type NewDevice = {
+	mac: string,
+	ip: string,
+	vendor: string | null,
+	hostname: string | null,
+};
+
 /**  Result of probing for the Npcap runtime, shared with the UI. */
 export type NpcapStatus = {
 	/**  `true` when pcap functions can safely be called. */
@@ -566,6 +771,13 @@ export type NpcapStatus = {
 	 *  where capabilities do not apply).
 	 */
 	grantCommand: string | null,
+};
+
+/**  A server a program offered an outdated TLS version to. */
+export type OldTls = {
+	server: EndpointRef,
+	/**  "TLS 1.0" */
+	version: string,
 };
 
 /**  One open port on a device, with the service it usually means. */
@@ -640,6 +852,24 @@ export type PingStatus = {
 	error: string | null,
 };
 
+/**  A program's use of one unencrypted service. */
+export type PlainUse = {
+	/**  "HTTP", "Telnet", … */
+	service: string,
+	transport: Transport,
+	port: number,
+	certainty: Certainty,
+	bytes: number,
+	/**
+	 *  Bytes exchanged with addresses on the Internet (the rest stayed on
+	 *  the local network).
+	 */
+	publicBytes: number,
+	endpointCount: number,
+	/**  The busiest few. */
+	endpoints: EndpointRef[],
+};
+
 /**
  *  The system Fishe runs on, for the wording that differs (how capture is
  *  allowed, what the file manager is called).
@@ -696,6 +926,33 @@ export type ProcessTick = {
 	knownPorts: number,
 };
 
+/**  One program's side of the session. */
+export type ProgramAudit = {
+	/**  Grouping key (lower-case executable name; `""` = unattributed). */
+	key: string,
+	name: string,
+	bytes: number,
+	/**  Remote addresses it exchanged traffic with. */
+	endpoints: number,
+	/**  Those on the Internet. */
+	publicEndpoints: number,
+	/**  Countries of the public endpoints, most traffic first. */
+	countries: Share[],
+	/**  Organisations owning them, most traffic first (a few). */
+	owners: Share[],
+	ownerCount: number,
+	/**
+	 *  Public endpoints whose owner is not known (no owner database, or
+	 *  not in it).
+	 */
+	unknownOwner: number,
+	plaintext: PlainUse[],
+	/**  Bytes over services that are certainly unencrypted. */
+	plainBytes: number,
+	tlsHellos: number,
+	oldTls: OldTls[],
+};
+
 /**  One program as sent to the UI. */
 export type ProgramRow = {
 	key: string,
@@ -748,6 +1005,16 @@ export type QualityTick = {
 	retransIn: number,
 	rttSamples: number,
 };
+
+/**  Who can reach a listening socket. */
+export type Reach = 
+/**
+ *  Bound to a network address: other machines can connect, unless a
+ *  firewall stops them (which Fishe does not see).
+ */
+"network" | 
+/**  Bound to the loopback address: this machine only. */
+"loopback";
 
 export type RecordOptions = {
 	/**  Display name; defaults to the session label. */
@@ -845,6 +1112,21 @@ export type ResolvedTarget = {
 	candidates: string[],
 };
 
+export type Route = {
+	via: RouteVia,
+	/**  Description of the interface used. */
+	interface: string | null,
+};
+
+/**  How Internet-bound traffic of one address family leaves this machine. */
+export type RouteVia = 
+/**  Through a tunnel interface. */
+"tunnel" | 
+/**  Through an ordinary adapter. */
+"direct" | 
+/**  This machine has no route for that family. */
+"none";
+
 /**  A measurement over the last tick. Rates are bytes (or packets) per second. */
 export type Sample = {
 	sessionId: number,
@@ -891,6 +1173,30 @@ export type Sample = {
 	recording: RecordingTick | null,
 };
 
+/**  Everything the Security page shows. */
+export type SecurityReport = {
+	state: SessionState,
+	session: SessionAudit | null,
+	/**  Programs accepting TCP connections right now; reachable ones first. */
+	listeners: Listener[],
+	/**  Why `listeners` is empty, when the socket table could not be read. */
+	listenersError: string | null,
+	/**  Local networks scanned so far, latest first. */
+	lans: KnownLan[],
+	/**
+	 *  Tunnel interfaces, where Internet traffic leaves, and what left
+	 *  outside the tunnel.
+	 */
+	vpn: VpnAudit,
+	/**
+	 *  Is the owner database installed? Without it organisations and
+	 *  countries are unknown.
+	 */
+	ownerData: boolean,
+	/**  Most severe first. */
+	findings: Finding[],
+};
+
 export type SeriesPoint = {
 	tMs: number,
 	inBps: number,
@@ -901,6 +1207,21 @@ export type SeriesPoint = {
 	level: Level,
 	/**  Mean TCP round-trip time of the tick (recordings since schema v3). */
 	rttMs?: number | null,
+};
+
+/**  What an all-traffic session saw. */
+export type SessionAudit = {
+	/**  Session time covered. */
+	tMs: number,
+	/**  Busiest first. */
+	programs: ProgramAudit[],
+	programCount: number,
+	/**  Most ports tried first. */
+	inbound: InboundPeer[],
+	inboundCount: number,
+	dns: DnsAudit,
+	/**  DHCP servers seen answering during the session, by interface. */
+	dhcp: DhcpSeen[],
 };
 
 /**
@@ -931,6 +1252,34 @@ export type SessionInfo = {
 	filter: string,
 	tickMs: number,
 	gauge: GaugeConfig,
+};
+
+/**  Why the report has no session part. */
+export type SessionState = 
+/**  An all-traffic session is running: `session` is filled. */
+"auditing" | 
+/**  Nothing is being monitored. */
+"noSession" | 
+/**
+ *  A session runs, but on one host or one program: it does not see
+ *  the whole machine.
+ */
+"notAllTraffic";
+
+/**  How much attention a finding asks for. */
+export type Severity = 
+/**  Worth knowing; usually nothing to do. */
+"info" | 
+/**  Worth a look. */
+"notice" | 
+/**  Worth acting on, or at least understanding. */
+"warning";
+
+export type Share = {
+	/**  A country code ("US") or an organisation's name. */
+	name: string,
+	bytes: number,
+	endpoints: number,
 };
 
 /**
@@ -984,5 +1333,48 @@ export type TransportBytes = {
 	udp: number,
 	icmp: number,
 	other: number,
+};
+
+/**  A tunnel interface that is up. */
+export type Tunnel = {
+	/**  Capture device name. */
+	name: string,
+	description: string,
+	/**  "WireGuard", "OpenVPN", … */
+	kind: string,
+	addresses: string[],
+};
+
+/**  The VPN card. */
+export type VpnAudit = {
+	/**  Tunnel interfaces that are up. */
+	tunnels: Tunnel[],
+	ipv4: Route,
+	ipv6: Route,
+	/**  Why the interfaces could not be listed, when they could not. */
+	error: string | null,
+	/**
+	 *  The running all-traffic session captures on a tunnel, so the figures
+	 *  below mean something. Otherwise they are zero.
+	 */
+	measured: boolean,
+	/**  Bytes exchanged with Internet addresses inside the tunnel. */
+	insideBytes: number,
+	/**
+	 *  Bytes exchanged with Internet addresses outside it, the VPN server's
+	 *  own traffic included.
+	 */
+	outsideBytes: number,
+	/**
+	 *  The busiest address reached outside the tunnel: almost always the
+	 *  VPN server, which the tunnel's own packets travel to.
+	 */
+	carrier: EndpointRef | null,
+	/**  The other Internet addresses reached outside the tunnel (a few). */
+	outside: EndpointRef[],
+	/**  How many there are. */
+	outsideCount: number,
+	/**  Unencrypted DNS questions that left outside the tunnel. */
+	dnsOutside: number,
 };
 

@@ -21,6 +21,8 @@
       <path d="M4 6h16M4 12h16M4 18h10" />
     {:else if id === "map"}
       <circle cx="6" cy="17" r="2.2" /><circle cx="18" cy="7" r="2.2" /><circle cx="17" cy="17.5" r="1.6" /><path d="M7.8 15.6l8.4-7.2M8.2 17.2h7.2" />
+    {:else if id === "security"}
+      <path d="M12 3.5l7 2.6v5.2c0 4.4-2.9 7.6-7 9.2-4.1-1.6-7-4.8-7-9.2V6.1z" /><path d="M9.2 12.2l2 2 3.7-4.1" />
     {:else if id === "archive"}
       <rect x="4" y="5" width="16" height="4" rx="1" /><path d="M5.5 9v9a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9M10 13h4" />
     {:else}

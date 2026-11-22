@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.17.0 (2026-11-20)
+
+- **Security page** (key 4; Archive is now 5, Settings 6). During an All
+  traffic session it lists what deserves a look, each with the reason:
+  programs using unencrypted services (FTP, Telnet, HTTP, …) or offering
+  nothing newer than TLS 1.0 / 1.1, addresses that tried many ports of this
+  machine, connections accepted from the Internet, DNS servers that fail or
+  are asked in clear text. Below the findings: who each program talks to
+  (organisations, countries), the connection attempts received, and the
+  DNS servers with their answer times.
+- The page also lists, at any time, the programs accepting connections and
+  whether other machines can reach them.
+- **VPN** on the Security page: the tunnel interfaces that are up, whether
+  IPv4 and IPv6 leave through one (a VPN that carries IPv4 while IPv6
+  leaves directly is flagged), and, in a session started while the tunnel
+  is up, the Internet addresses and DNS questions that left outside it.
+- LAN scans are remembered between runs: a scan marks the devices that were
+  not there before, and the Security page says when the gateway answers
+  from another hardware address. **Forget devices** deletes that memory.
+- A LAN scan now also asks which DHCP servers answer (one broadcast
+  question; no lease is taken) and shows what each hands out. More than
+  one on a network is flagged, as are DHCP answers from several servers
+  heard during a session.
+- Agents get the same report through a new read-only tool,
+  `get_security_report`.
+- Fishe reads packet headers, not content: findings state what was seen
+  and what it does not prove. docs/security.md has the rules and limits.
+
 ## 0.16.0 (2026-11-20)
 
 - **Linux.** Fishe runs on Linux, from a `.deb` or `.rpm` package: capture

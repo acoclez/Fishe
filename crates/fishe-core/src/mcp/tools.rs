@@ -190,6 +190,13 @@ struct IpArgs {
     ip: String,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SecurityArgs {
+    /// Rows per table (programs, inbound, listeners); default 25, at most 200
+    max_rows: Option<usize>,
+}
+
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[schemars(inline)]
@@ -409,6 +416,23 @@ const TOOLS: &[Tool] = &[
         access: Access::Read,
         schema: schema_of::<IpArgs>,
         handler: |svc, v| lookup_owner(svc, parse(v)?),
+    },
+    Tool {
+        name: "get_security_report",
+        title: "Security report",
+        description: "What on this machine deserves attention, from facts Fishe observed (it reads packet headers, \
+            not content, and never judges intent). findings: each with a severity (info/notice/warning), what was \
+            seen and why it matters: unencrypted services, outdated TLS, port scans, connections accepted from the \
+            Internet, sensitive services reachable from the network, failing or unencrypted DNS, a gateway whose \
+            hardware address changed, new devices on the local network, several DHCP servers on one network, traffic \
+            or DNS leaving outside a VPN. vpn: tunnel interfaces that are up, whether IPv4 and IPv6 leave through \
+            one, and what was reached outside it. session (only while an all-traffic session \
+            runs; state says otherwise): per program its endpoints, countries, organisations and unencrypted use; \
+            inbound connection attempts; DNS servers with failures and latency. listeners: programs accepting TCP \
+            connections right now. lans: local networks scanned so far.",
+        access: Access::Read,
+        schema: schema_of::<SecurityArgs>,
+        handler: |svc, v| get_security_report(svc, parse(v)?),
     },
     Tool {
         name: "start_monitoring",
@@ -1166,6 +1190,18 @@ fn get_pings(svc: &Services, _: NoArgs) -> Result<Value, String> {
 
 fn probe_target(ip: &str) -> Result<std::net::IpAddr, String> {
     ops::probe_target(ip).map_err(err_text)
+}
+
+fn get_security_report(svc: &Services, a: SecurityArgs) -> Result<Value, String> {
+    let rows = a.max_rows.unwrap_or(25).clamp(1, 200);
+    let mut report = ops::security_report(svc);
+    // The counts stay in the report; only the listings are shortened.
+    if let Some(s) = &mut report.session {
+        s.programs.truncate(rows);
+        s.inbound.truncate(rows);
+    }
+    report.listeners.truncate(rows);
+    serde_json::to_value(&report).map_err(|e| e.to_string())
 }
 
 fn lookup_owner(svc: &Services, a: IpArgs) -> Result<Value, String> {

@@ -99,6 +99,23 @@ pub struct PortUsage {
 /// Upper bound on distinct ports tracked, to bound memory on port scans.
 pub const MAX_TRACKED_PORTS: usize = 2048;
 
+/// Connection requests one remote address sent to one local port.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct InboundHit {
+    /// Requests received (TCP SYN).
+    pub syns: u32,
+    /// Requests this machine accepted (it answered SYN-ACK).
+    pub answered: u32,
+}
+
+/// Upper bound on (remote address, local port) pairs per batch: a port
+/// scan fills it, and the rest of the scan is not needed to call it one.
+pub const MAX_INBOUND: usize = 1024;
+
+/// Upper bound on (remote address, service port) pairs whose payload is
+/// noted per batch.
+pub const MAX_PAYLOAD_PORTS: usize = 1024;
+
 /// A batch of counts.
 #[derive(Debug, Default, Clone)]
 pub struct Tally {
@@ -115,6 +132,13 @@ pub struct Tally {
     pub programs: HashMap<u32, Counters>,
     /// TCP connection quality of the counted flows (see `quality.rs`).
     pub quality: QualityDelta,
+    /// Connections other machines tried to open to this one, by
+    /// (remote address, local port). For the security view.
+    pub inbound: HashMap<(IpAddr, u16), InboundHit>,
+    /// TCP payload bytes exchanged with a remote address on a service port
+    /// the security view reports (unencrypted services, DNS over TLS).
+    /// Payload, not packets: a refused connection request carries none.
+    pub payload: HashMap<(IpAddr, u16), u64>,
 }
 
 /// Program key for packets without an owner (PID 0 never owns a socket in
@@ -169,6 +193,37 @@ impl Tally {
     /// Record one matched packet of `wire_len` bytes (original length on the wire).
     pub fn record(&mut self, dir: Direction, info: &PacketInfo, wire_len: u32) {
         self.record_endpoint(dir, info, wire_len);
+    }
+
+    /// A TCP handshake packet between `remote` and local port `lport`:
+    /// a request from the remote side (`dir` in, no ACK) or this machine
+    /// accepting one (`dir` out, with ACK). Requests this machine sends
+    /// are not attempts on it and are ignored.
+    pub fn note_syn(&mut self, dir: Direction, ack: bool, remote: IpAddr, lport: u16) {
+        let key = (remote, lport);
+        if self.inbound.len() >= MAX_INBOUND && !self.inbound.contains_key(&key) {
+            return;
+        }
+        match (dir, ack) {
+            (Direction::In, false) => {
+                let hit = self.inbound.entry(key).or_default();
+                hit.syns = hit.syns.saturating_add(1);
+            }
+            (Direction::Out, true) => {
+                let hit = self.inbound.entry(key).or_default();
+                hit.answered = hit.answered.saturating_add(1);
+            }
+            _ => {}
+        }
+    }
+
+    /// `bytes` of TCP payload passed between this machine and `remote` on
+    /// service `port`.
+    pub fn note_payload(&mut self, remote: IpAddr, port: u16, bytes: u64) {
+        let key = (remote, port);
+        if self.payload.len() < MAX_PAYLOAD_PORTS || self.payload.contains_key(&key) {
+            *self.payload.entry(key).or_default() += bytes;
+        }
     }
 
     /// Add TCP quality measurements of a counted flow to `remote`.
@@ -245,6 +300,16 @@ impl Tally {
             self.programs.entry(*pid).or_default().merge(c);
         }
         self.quality.merge(&other.quality);
+        for (key, hit) in &other.inbound {
+            if self.inbound.len() < MAX_INBOUND || self.inbound.contains_key(key) {
+                let h = self.inbound.entry(*key).or_default();
+                h.syns = h.syns.saturating_add(hit.syns);
+                h.answered = h.answered.saturating_add(hit.answered);
+            }
+        }
+        for (&(remote, port), &bytes) in &other.payload {
+            self.note_payload(remote, port, bytes);
+        }
     }
 
     /// The `n` ports with the most bytes, descending.

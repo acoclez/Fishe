@@ -64,6 +64,10 @@ const tauriApi = {
   mcpClearActivity: commands.mcpClearActivity,
   networkContext: commands.networkContext,
   scanLan: commands.scanLan,
+  /** Forget the devices remembered from LAN scans. */
+  lanForget: () => done(commands.lanForget()),
+  /** The security view's report: built on request, sends nothing. */
+  securityReport: commands.securityReport,
 
   startRecording: commands.startRecording,
   stopRecording: commands.stopRecording,

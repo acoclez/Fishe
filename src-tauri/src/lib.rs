@@ -80,6 +80,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             commands::cached_traces,
             commands::network_context,
             commands::scan_lan,
+            commands::lan_forget,
+            commands::security_report,
             commands::subscribe_monitor,
             commands::set_monitor_defaults,
             commands::start_monitor,

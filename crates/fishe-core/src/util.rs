@@ -4,6 +4,21 @@
 use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// Write `bytes` to `path` so that a crash leaves either the old file or
+/// the new one, never half of it: a sibling file is written, then renamed.
+pub fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = std::path::PathBuf::from(tmp);
+    std::fs::write(&tmp, bytes)?;
+    std::fs::rename(&tmp, path).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })
+}
+
 /// Unix time in milliseconds (0 if the clock is before 1970).
 pub fn now_ms() -> u64 {
     std::time::SystemTime::now()

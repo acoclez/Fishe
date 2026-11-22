@@ -98,7 +98,9 @@ both through to agents).
 | `mcp_new_token` | none | `McpStatus` | Replaces the token |
 | `mcp_activity` / `mcp_clear_activity` | none | `McpActivity[]` / none | Agent calls, newest first (≤ 200) |
 | `network_context` | none | `NetContext` | Default gateways and LAN neighbour table |
-| `scan_lan` | `probePorts: boolean` | `LanScan` | Active LAN scan: ARP sweep, MAC vendor, reverse DNS, optional port probe. User action only (sends packets) |
+| `scan_lan` | `probePorts: boolean` | `LanScan` | Active LAN scan: ARP sweep, one DHCP discovery, MAC vendor, reverse DNS, optional port probe. User action only (sends packets). The devices found are remembered in `lan.json`, and each is marked `isNew` when it was not there at the previous scan |
+| `lan_forget` | none | none | Deletes the remembered devices |
+| `security_report` | none | `SecurityReport` | The security view ([security.md](security.md)): `state` (`auditing`, `noSession`, `notAllTraffic`), `session` (programs, inbound attempts, DNS, DHCP servers heard; only in an all-traffic session), `listeners`, `vpn` (tunnels, how IPv4 and IPv6 leave, what left outside the tunnel), `lans`, `findings`. Built on request; sends nothing |
 
 See [owners.md](owners.md) and [lan-mapping.md](lan-mapping.md).
 
@@ -332,9 +334,13 @@ interface Hop { ttl; addr: string | null; alternates: string[]; rttMs: number | 
 interface TraceResult { target; startedAt; durationMs; reached: boolean; hops: Hop[] }
 interface NetContext { gateways: { ip; interfaceIndex; metric }[]; neighbors: { ip; mac; state; interfaceIndex }[] }
 interface LanScan { networks: LanNetwork[]; durationMs; probedPorts: boolean; note: string | null }
-interface LanNetwork { interface; description; ip; prefix; gateway: string | null; wireless: boolean; narrowed: boolean; devices: LanDevice[] }
+interface LanNetwork { interface; description; ip; prefix; gateway: string | null; wireless: boolean; narrowed: boolean; devices: LanDevice[];
+                      dhcp: DhcpServer[] /* the servers that answered the scan's DHCPDISCOVER */ }
+interface DhcpServer { ip; mac: string | null; vendor: string | null; offered: string | null; router: string | null; dns: string[];
+                      leaseSecs: number | null; isGateway: boolean }
 interface LanDevice { ip; mac: string | null; vendor: string | null; hostname: string | null;
-                     randomizedMac: boolean; isGateway: boolean; isSelf: boolean; ports: { port: number; service: string | null }[] }
+                     randomizedMac: boolean; isGateway: boolean; isSelf: boolean;
+                     isNew: boolean; firstSeen: number | null /* Unix ms */; ports: { port: number; service: string | null }[] }
 interface Owner { asn: number | null; org: string | null; country: string | null /* ISO alpha-2 */; source: "dbip" | "ipinfo" }
 interface GeoStatus { installed; hasAsn; hasCountry; month: string | null; builtAt: number | null; downloadedAt: number | null;
                       currentMonth: string; updateAvailable: boolean; bytes: number; onlineEnabled: boolean; attribution: string; dir: string }

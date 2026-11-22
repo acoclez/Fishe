@@ -8,6 +8,7 @@
  * `index.ts` imports it lazily, and only outside a production build.
  */
 import type { Api } from "./index";
+import { demoDhcp, demoLanForget, demoLanScanned, demoSecurityReport } from "./demoSecurity";
 import type {
   Hop,
   LanDevice,
@@ -142,6 +143,8 @@ const DEMO_ENDPOINTS: DemoEndpoint[] = [
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let session = 0;
+/** When the running preview session started (for the security report). */
+let demoSessionStart = 0;
 /** The window's subscription (see `subscribe_monitor`). */
 let sink: (e: MonitorEvent) => void = () => {};
 
@@ -164,6 +167,7 @@ export function demoStop(): boolean {
 /** Same contract as the real `start_monitor`: events go to the subscriber. */
 export function demoStart(req: StartRequest): SessionInfo {
   demoStop();
+  demoSessionStart = Date.now();
   const sessionId = ++session;
   const onEvent = (e: MonitorEvent) => sink(e);
   // Like the backend: a missing or null override keeps the default.
@@ -722,21 +726,27 @@ export const demoRoutes = {
       { ip: "192.168.1.23", mac: "3c:22:fb:aa:bb:cc", state: "reachable", interfaceIndex: 9 },
     ],
   }),
+  lanForget: async () => demoLanForget(),
+  securityReport: async () => demoSecurityReport(demoSession?.mode ?? null, demoSessionStart),
   scanLan: async (probePorts: boolean): Promise<LanScan> => {
     await new Promise((r) => setTimeout(r, 1200));
+    // The second scan of the preview finds a device that was not there.
+    const scanNo = demoLanScanned();
+    const firstScan = Date.now() - 86_400_000 * 12;
+    const seen = { isNew: false, firstSeen: scanNo > 1 ? firstScan : Date.now() };
     const port = (n: number, s: string | null) => ({ port: n, service: s });
     const devices: LanDevice[] = [
-      { ip: "192.168.1.1", mac: "c8:7f:2b:35:1a:c0", vendor: "Arcadyan", hostname: "livebox.home", randomizedMac: false, isGateway: true, isSelf: false, ports: probePorts ? [port(53, "DNS"), port(80, "HTTP"), port(443, "HTTPS")] : [] },
-      { ip: "192.168.1.19", mac: "e4:5f:01:aa:12:7c", vendor: "Raspberry Pi Foundation", hostname: "fishe-pc.home", randomizedMac: false, isGateway: false, isSelf: true, ports: [] },
-      { ip: "192.168.1.23", mac: "3c:22:fb:aa:bb:cc", vendor: "Apple", hostname: null, randomizedMac: false, isGateway: false, isSelf: false, ports: probePorts ? [port(62078, "iPhone sync")] : [] },
-      { ip: "192.168.1.40", mac: "b0:95:75:de:ad:01", vendor: "Texas Instruments", hostname: "nas.home", randomizedMac: false, isGateway: false, isSelf: false, ports: probePorts ? [port(80, "HTTP"), port(139, "NetBIOS"), port(445, "SMB"), port(5000, "Web / UPnP")] : [] },
-      { ip: "192.168.1.52", mac: "9c:8e:cd:31:44:aa", vendor: "HP", hostname: "officejet.home", randomizedMac: false, isGateway: false, isSelf: false, ports: probePorts ? [port(80, "HTTP"), port(515, "Printer (LPD)"), port(631, "Printer (IPP)"), port(9100, "Printer (raw)")] : [] },
-      { ip: "192.168.1.66", mac: "da:a1:19:7f:00:21", vendor: null, hostname: null, randomizedMac: true, isGateway: false, isSelf: false, ports: probePorts ? [port(554, "RTSP (camera)")] : [] },
-      { ip: "192.168.1.88", mac: "44:65:0d:12:9b:55", vendor: "Amazon Technologies", hostname: "echo-dot.home", randomizedMac: false, isGateway: false, isSelf: false, ports: probePorts ? [port(8080, "Web (alt)")] : [] },
+      { ip: "192.168.1.1", mac: "c8:7f:2b:35:1a:c0", vendor: "Arcadyan", hostname: "livebox.home", randomizedMac: false, isGateway: true, isSelf: false, ...seen, ports: probePorts ? [port(53, "DNS"), port(80, "HTTP"), port(443, "HTTPS")] : [] },
+      { ip: "192.168.1.19", mac: "e4:5f:01:aa:12:7c", vendor: "Raspberry Pi Foundation", hostname: "fishe-pc.home", randomizedMac: false, isGateway: false, isSelf: true, isNew: false, firstSeen: null, ports: [] },
+      { ip: "192.168.1.23", mac: "3c:22:fb:aa:bb:cc", vendor: "Apple", hostname: null, randomizedMac: false, isGateway: false, isSelf: false, ...seen, ports: probePorts ? [port(62078, "iPhone sync")] : [] },
+      { ip: "192.168.1.40", mac: "b0:95:75:de:ad:01", vendor: "Texas Instruments", hostname: "nas.home", randomizedMac: false, isGateway: false, isSelf: false, ...seen, ports: probePorts ? [port(80, "HTTP"), port(139, "NetBIOS"), port(445, "SMB"), port(5000, "Web / UPnP")] : [] },
+      { ip: "192.168.1.52", mac: "9c:8e:cd:31:44:aa", vendor: "HP", hostname: "officejet.home", randomizedMac: false, isGateway: false, isSelf: false, ...seen, ports: probePorts ? [port(80, "HTTP"), port(515, "Printer (LPD)"), port(631, "Printer (IPP)"), port(9100, "Printer (raw)")] : [] },
+      { ip: "192.168.1.66", mac: "da:a1:19:7f:00:21", vendor: null, hostname: null, randomizedMac: true, isGateway: false, isSelf: false, isNew: scanNo === 2, firstSeen: scanNo === 2 ? Date.now() : seen.firstSeen, ports: probePorts ? [port(554, "RTSP (camera)")] : [] },
+      { ip: "192.168.1.88", mac: "44:65:0d:12:9b:55", vendor: "Amazon Technologies", hostname: "echo-dot.home", randomizedMac: false, isGateway: false, isSelf: false, ...seen, ports: probePorts ? [port(8080, "Web (alt)")] : [] },
     ];
     return {
       networks: [
-        { interface: "Wi-Fi", description: "Intel Wi-Fi 6 AX201", ip: "192.168.1.19", prefix: 24, gateway: "192.168.1.1", wireless: true, narrowed: false, devices },
+        { interface: "Wi-Fi", description: "Intel Wi-Fi 6 AX201", ip: "192.168.1.19", prefix: 24, gateway: "192.168.1.1", wireless: true, narrowed: false, devices, dhcp: demoDhcp() },
       ],
       durationMs: 1200,
       probedPorts: probePorts,

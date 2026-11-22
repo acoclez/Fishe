@@ -25,6 +25,7 @@ use fishe_core::process::processes::{self, ProcessGroup};
 use fishe_core::route::TraceResult;
 use fishe_core::route::lan::{self, NetContext};
 use fishe_core::route::ping::PingStatus;
+use fishe_core::security::SecurityReport;
 use fishe_core::services::Services;
 use std::sync::Arc;
 use tauri::ipc::Channel;
@@ -604,6 +605,26 @@ pub async fn network_context() -> AppResult<NetContext> {
 /// Sends packets, so it runs only when the user asks.
 #[tauri::command]
 #[specta::specta]
-pub async fn scan_lan(probe_ports: bool) -> AppResult<fishe_core::lan::ScanResult> {
-    blocking(move || fishe_core::lan::scan(probe_ports)).await
+pub async fn scan_lan(svc: Svc<'_>, probe_ports: bool) -> AppResult<fishe_core::lan::ScanResult> {
+    let svc = svc.inner().clone();
+    blocking(move || ops::scan_lan(&svc, probe_ports)).await
+}
+
+/// Forget the devices remembered from LAN scans (`lan.json`).
+#[tauri::command]
+#[specta::specta]
+pub fn lan_forget(svc: Svc<'_>) -> AppResult<()> {
+    ops::lan_forget(&svc)
+}
+
+// ─────────────────────────── security ───────────────────────────
+
+/// The security view: what the running all-traffic session saw, the
+/// programs accepting connections, the local networks scanned so far, and
+/// the findings derived from them. Reads; sends nothing.
+#[tauri::command]
+#[specta::specta]
+pub async fn security_report(svc: Svc<'_>) -> AppResult<SecurityReport> {
+    let svc = svc.inner().clone();
+    blocking(move || Ok(ops::security_report(&svc))).await
 }

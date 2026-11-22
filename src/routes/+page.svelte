@@ -16,6 +16,7 @@
   import ConnectionsPage from "#lib/pages/connections/ConnectionsPage.svelte";
   import LivePage from "#lib/pages/live/LivePage.svelte";
   import MapPage from "#lib/pages/map/MapPage.svelte";
+  import SecurityPage from "#lib/pages/security/SecurityPage.svelte";
   import { session } from "#lib/stores/session.svelte.ts";
   import { settings } from "#lib/stores/settings.svelte.ts";
 
@@ -104,6 +105,8 @@
         <ConnectionsPage />
       {:else if nav.page === "map"}
         <MapPage />
+      {:else if nav.page === "security"}
+        <SecurityPage />
       {:else if nav.page === "archive"}
         <ArchivePage bind:openId={session.openRecording} refreshKey={session.archiveKey} />
       {:else}

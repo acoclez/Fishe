@@ -7,6 +7,7 @@
 //! <root>/archive/fishe.db, captures/*.pcapng   recordings   (archive)
 //! <root>/geo/*.mmdb, meta.json                 owner data   (geo)
 //! <root>/mcp.json                              MCP settings (mcp)
+//! <root>/lan.json                              devices seen by LAN scans (lan::inventory)
 //! <root>/logs/fishe.log, fishe.1.log           log file     (logging)
 //! ```
 
@@ -71,6 +72,11 @@ impl Paths {
         self.root.join("mcp.json")
     }
 
+    /// Devices seen on the local networks, between scans.
+    pub fn lan_inventory(&self) -> PathBuf {
+        self.root.join("lan.json")
+    }
+
     /// The log file and its rotated predecessor.
     pub fn logs(&self) -> PathBuf {
         self.root.join("logs")
@@ -94,6 +100,7 @@ mod tests {
         assert_eq!(p.archive(), root.join("archive"));
         assert_eq!(p.geo(), root.join("geo"));
         assert_eq!(p.mcp_config(), root.join("mcp.json"));
+        assert_eq!(p.lan_inventory(), root.join("lan.json"));
         assert_eq!(p.logs(), root.join("logs"));
         assert!(
             Paths::from_env_or_default()

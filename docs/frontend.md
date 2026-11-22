@@ -18,7 +18,8 @@ src/
    │  ├─ index.ts             invoke wrappers; demo backend outside Tauri
    │  ├─ bindings.ts          generated from Rust by tauri-specta: `commands.*` + IPC types
    │  ├─ types.ts             re-exports the generated types; UI-only types (Units, TrafficPoint, TopItem)
-   │  └─ demo.ts              simulated backend for browser previews
+   │  ├─ demo.ts              simulated backend for browser previews
+   │  └─ demoSecurity.ts      its security report (sample findings and tables)
    ├─ stores/                 shared state (runes)
    │  ├─ monitor.svelte.ts    session store (events, samples, histories, focus, recording)
    │  ├─ session.svelte.ts    session controller: start/restart/record, startup data, the derived "view" the pages share
@@ -26,6 +27,7 @@ src/
    │  ├─ nav.svelte.ts        current page, number keys, scroll per page, settings sections
    │  ├─ routes.svelte.ts     traceroute queue/results, gateways & neighbours
    │  ├─ lan.svelte.ts        the last LAN scan, kept while the app is open
+   │  ├─ security.svelte.ts   the security report, polled while its page is open; keeps the last session's part
    │  ├─ pings.svelte.ts      running pings
    │  ├─ agents.svelte.ts     MCP server status, activity log, backend notices
    │  └─ stable.svelte.ts     StableList: rows that hold still while you read them
@@ -72,6 +74,8 @@ src/
       │  ├─ MapPage.svelte           LAN scan, traffic map or route
       │  ├─ NetworkMap.svelte        network map (routes graph), pan/zoom, highlight, focus
       │  └─ LanScan.svelte           devices on the local network: list or star map
+      ├─ security/
+      │  └─ SecurityPage.svelte      findings, programs, listening services, inbound attempts, DNS, local network
       ├─ archive/
       │  ├─ ArchivePage.svelte       recordings list: open, rename, export, reveal, delete
       │  ├─ RecordingView.svelte     replay: tiles, full-length chart, moments, endpoints
@@ -185,14 +189,15 @@ header shows the page name and the status chips (REC, Agents, Ping, Live).
 | **Live** | 1 | Target bar, process/all strip, focus bar, gauge and tiles, chart, connection quality, the **five busiest** programs (all traffic) or endpoints (process) with *All N →*, protocols and top services |
 | **Connections** | 2 | Focus bar, the full Programs table (all traffic), then **Endpoints** or **Packets** |
 | **Map** | 3 | LAN scan (device list / star map, no session needed), then the traffic map (process / all) or the route in host mode |
-| **Archive** | 4 | Recordings (`ArchivePage`) |
-| **Settings** | 5 | Section index on the left (Measurement, Recording and names, Owners database, Agents) and the sections; the index follows the scroll |
+| **Security** | 4 | Findings first, then the facts behind them: programs, listening services, inbound attempts, DNS, local networks ([security.md](security.md)). Polls `security_report` every 2 s while open; rows are ordered by name, address or port, never by a figure that moves |
+| **Archive** | 5 | Recordings (`ArchivePage`) |
+| **Settings** | 6 | Section index on the left (Measurement, Recording and names, Owners database, Agents) and the sections; the index follows the scroll |
 
 - The session keeps running (and recording) on every page. Focus (an
   endpoint or program) is shared: set it on Connections or Map, see the
   gauge follow on Live. Connections and Map show an empty state with a
   *Go to Live* button when there is no program or all-traffic session.
-- Number keys **1–5** open the pages (ignored while typing in a field).
+- Number keys **1–6** open the pages (ignored while typing in a field).
   The last page is remembered across launches; each page keeps its scroll
   position while the app runs.
 - The rail is fixed-width and its active marker moves with a transform;
@@ -337,7 +342,8 @@ Open the preview with `?npcap-missing` to see the app as on a PC without
 Npcap: the install prompt, the header chip, the disabled LAN scan. The first
 **Check again** still finds nothing, the second one finds it. Add `?linux`
 (`?linux&npcap-missing`) for the wording used on Linux and its permission
-prompt.
+prompt. On the Security page, `?vpn` shows a VPN that is up with IPv6
+leaving beside it, and `?dhcp2` a second DHCP server on the local network.
 
 ## Accessibility
 

@@ -28,6 +28,11 @@ network.
   this PC to every endpoint.
 - **LAN scan.** The devices on the local network, with their maker and the
   services they offer.
+- **Security view.** What deserves a look, with the reason: programs using
+  unencrypted services or outdated TLS, who each program talks to, the
+  services this machine exposes and who tried to connect, DNS servers,
+  whether a VPN really carries the traffic, and on the local network new
+  devices, a changed gateway or a second DHCP server.
 - **Recordings.** A session can be recorded, replayed later and exported to
   CSV or JSON, optionally with a pcapng file of the packet headers.
 - **An interface for AI agents.** A local Model Context Protocol (MCP)
@@ -78,8 +83,9 @@ The pages, each one key away:
 | 1 | Live | Gauge, rates, chart, connection quality, the busiest programs or endpoints, protocols and ports |
 | 2 | Connections | Every program and endpoint of the session, or the live packet list |
 | 3 | Map | The LAN scan and the map of routes to the endpoints |
-| 4 | Archive | Saved recordings: replay, rename, export, delete |
-| 5 | Settings | Sensitivity, units, owner database, agents, diagnostics |
+| 4 | Security | Findings, what each program talks to, listening services, inbound connection attempts, DNS, VPN, the local network |
+| 5 | Archive | Saved recordings: replay, rename, export, delete |
+| 6 | Settings | Sensitivity, units, owner database, agents, diagnostics |
 
 Clicking a program or an endpoint focuses the gauge and the chart on it.
 
@@ -142,6 +148,7 @@ and the release process.
 | [connection-quality.md](docs/connection-quality.md) | Round-trip time, jitter, retransmissions, ping |
 | [network-map.md](docs/network-map.md) | Traceroute and the map layout |
 | [lan-mapping.md](docs/lan-mapping.md) | The LAN scan |
+| [security.md](docs/security.md) | The security view: what is reported, the rules, the limits |
 | [archive.md](docs/archive.md) | Recordings, storage, exports |
 | [mcp.md](docs/mcp.md) | The MCP server: setup, tools, security |
 | [ipc-api.md](docs/ipc-api.md) | Commands, events and types between the window and the backend |

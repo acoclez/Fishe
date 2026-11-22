@@ -45,6 +45,7 @@ use crate::process::etw::EtwTracker;
 use crate::process::machine::MachineScope;
 use crate::process::refresh::{refresh_machine, refresh_process};
 use crate::process::scope::ProcessScope;
+use crate::security::audit::Audit;
 use std::collections::{HashSet, VecDeque};
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -106,7 +107,7 @@ fn held_copy(h: &Held) -> (u64, Option<&[u8]>) {
 // `timeval`'s fields are 32-bit on Windows and 64-bit on Linux: the casts are
 // needed on one and a no-op on the other.
 #[allow(clippy::unnecessary_cast)]
-fn ts_us(h: &pcap::PacketHeader) -> u64 {
+pub(crate) fn ts_us(h: &pcap::PacketHeader) -> u64 {
     (h.ts.tv_sec as i64).max(0) as u64 * 1_000_000 + (h.ts.tv_usec as i64).max(0) as u64
 }
 
@@ -414,6 +415,8 @@ pub struct Session {
     pub live: Arc<Live>,
     /// Owner/country lookups for endpoint rows.
     pub geo: Arc<Geo>,
+    /// The security view's facts (all-traffic mode).
+    pub audit: Option<Arc<Audit>>,
     pub gauge: GaugeConfig,
     pub tick: Duration,
 }
@@ -434,6 +437,8 @@ pub struct SessionPlan {
     pub recording: Arc<RecordingSlot>,
     /// Owner/country lookups for endpoint rows.
     pub geo: Arc<Geo>,
+    /// The security view's facts, shared with `MonitorState` (all-traffic mode).
+    pub audit: Option<Arc<Audit>>,
     pub captures: Vec<OpenCapture>,
     pub gauge: GaugeConfig,
     pub tick: Duration,
@@ -523,6 +528,11 @@ impl Aggregator {
                 dropped,
                 if_dropped,
             } => {
+                // Per interface, before the workers' counts are merged: the
+                // security view tells a VPN tunnel from the other interfaces.
+                if let Some(audit) = &self.s.audit {
+                    audit.note_worker(worker, &tally.endpoints);
+                }
                 self.window.merge(&tally);
                 if let Some(d) = self.drops.get_mut(worker) {
                     *d = (dropped, if_dropped);
@@ -582,6 +592,8 @@ impl Aggregator {
         let window_endpoints = std::mem::take(&mut w.endpoints);
         let window_programs = std::mem::take(&mut w.programs);
         let window_quality = std::mem::take(&mut w.quality);
+        let window_inbound = std::mem::take(&mut w.inbound);
+        let window_payload = std::mem::take(&mut w.payload);
         self.totals.merge(&w);
         let t_ms = now.saturating_duration_since(self.started).as_millis() as u64;
 
@@ -594,6 +606,15 @@ impl Aggregator {
             }
             None => Default::default(),
         };
+        if let Some(audit) = &s.audit {
+            audit.tick(
+                t_ms,
+                &window_endpoints,
+                &window_payload,
+                &window_inbound,
+                &labels,
+            );
+        }
         let programs_tick = self.program_book.as_mut().map(|book| {
             book.tick(&window_programs, &window_endpoints, &labels, secs, t_ms);
             ProgramsTick {
@@ -717,6 +738,7 @@ pub fn run(plan: SessionPlan) {
         live,
         recording,
         geo,
+        audit,
         captures,
         gauge,
         tick,
@@ -757,9 +779,22 @@ pub fn run(plan: SessionPlan) {
         }) => {
             for (i, open) in captures.into_iter().enumerate() {
                 let (b, l, s) = (book.clone(), local.clone(), worker_stop.clone());
+                let tap = audit
+                    .as_ref()
+                    .zip(machine.as_ref())
+                    .map(|(a, m)| sniffer::AuditTap {
+                        audit: a.clone(),
+                        machine: m.scope.clone(),
+                        interface: open.device_description.clone(),
+                        tunnel: crate::security::vpn::tunnel_kind(
+                            &open.device_name,
+                            &open.device_description,
+                        )
+                        .is_some(),
+                    });
                 match std::thread::Builder::new()
                     .name(format!("fishe-naming-{session_id}-{i}"))
-                    .spawn(move || sniffer::run(open, b, l, s))
+                    .spawn(move || sniffer::run(open, b, l, tap, s))
                 {
                     Ok(h) => handles.push(h),
                     Err(e) => log::warn!("failed to spawn naming thread {i}: {e}"),
@@ -780,6 +815,7 @@ pub fn run(plan: SessionPlan) {
             recording,
             live,
             geo,
+            audit,
             gauge,
             tick,
         },
@@ -1025,6 +1061,7 @@ mod tests {
             recording: Arc::new(RecordingSlot::default()),
             live: Arc::new(Live::default()),
             geo: Arc::new(Geo::new(PathBuf::from("fishe-test-no-geo-db"))),
+            audit: None,
             gauge: GaugeConfig::default(),
             tick,
         }

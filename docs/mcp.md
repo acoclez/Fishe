@@ -97,6 +97,7 @@ against its own learned normal.
 | `get_route_traces` | read | Traceroutes done this run |
 | `get_pings` | read | Running/stopped pings with figures and the last 30 probes |
 | `lookup_owner` | read | `ip`: ASN, organisation, country |
+| `get_security_report` | read | `maxRows` (default 25, ≤ 200): `findings` (severity info / notice / warning, what was seen, why it matters), `session` (all-traffic sessions: per program its endpoints, countries, organisations, unencrypted use and outdated TLS; inbound connection attempts; DNS servers), `listeners` (programs accepting TCP connections now), `vpn` (tunnel interfaces, whether IPv4 and IPv6 leave through one, what was reached outside it), `lans` (local networks scanned, with their DHCP servers). `state` says when no all-traffic session runs. See [security.md](security.md) |
 | `start_monitoring` | control | `mode` host / process / all, with `host`, `process` (exe name) or `pid`, optional `interface`. Returns once the first measurement is in; a `note` says when no process matches yet (Fishe waits for it to start) |
 | `stop_monitoring` | control | Stops the session (a running recording is saved) |
 | `start_recording` / `stop_recording` | control | `name`, `pcap` / returns the saved recording's id |

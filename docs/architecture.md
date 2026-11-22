@@ -74,6 +74,7 @@ program or PID, see [process-mode.md](process-mode.md)).
 | `route/*` | Traceroute and continuous ping (the Windows ICMP API; a raw ICMP socket on Linux), gateways and LAN neighbours (IP Helper; the routing socket on Linux, `route/netlink.rs`). See [network-map.md](network-map.md), [connection-quality.md](connection-quality.md). |
 | `lan/*` | LAN map: adapter list (`GetAdaptersAddresses`; the routing socket on Linux), active ARP sweep through the capture library, MAC→vendor from the bundled IEEE list, common-port probe. See [lan-mapping.md](lan-mapping.md). |
 | `geo/*` | Endpoint owner & country: DB-IP Lite (offline, downloaded on request), ipinfo.io (opt-in). See [owners.md](owners.md). |
+| `security/*` | The security view: the session's audit (programs, connection attempts, DNS, TLS offers), the report and its findings; the LAN device inventory is `lan/inventory.rs`. See [security.md](security.md). |
 | `monitor/target.rs` | `TargetSpec` (host / process / all), `ProcessSelector` (name / pid), `Matcher`, `Verdict` (`Match`, `Owned`, `Skip`, `Pending`). |
 | `monitor/engine.rs` | `WorkerCore` (parse, classify, hold/retry pending) and `Aggregator` (merge, tick, refresh, emit) as plain state machines, unit-tested with synthetic packets; `run` wraps them in the pcap loop, threads and UI channel. |
 | `monitor/stats.rs` | `Tally` (mergeable counters, per-protocol bytes, port table). |

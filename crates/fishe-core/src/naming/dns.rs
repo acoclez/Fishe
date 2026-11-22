@@ -30,6 +30,13 @@ pub fn response_id(msg: &[u8]) -> Option<u16> {
         .flatten()
 }
 
+/// The response code of a response: 0 = answered, 3 = no such name, 2 = the
+/// server failed, 5 = it refused.
+pub fn response_code(msg: &[u8]) -> Option<u8> {
+    let flags = be16(msg, 2)?;
+    (flags & 0x8000 != 0).then_some((flags & 0x000F) as u8)
+}
+
 fn parse(msg: &[u8]) -> Option<Vec<(IpAddr, String)>> {
     let flags = be16(msg, 2)?;
     let is_response = flags & 0x8000 != 0;
@@ -210,6 +217,21 @@ pub(crate) mod tests {
             let m = response(None, &[(name(bad), 1, vec![192, 168, 1, 50])]);
             assert!(parse_response(&m).is_empty(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn response_codes() {
+        let msg = |flags: u16| {
+            let mut m = vec![0x12, 0x34];
+            m.extend_from_slice(&flags.to_be_bytes());
+            m.extend_from_slice(&[0, 1, 0, 0, 0, 0, 0, 0]);
+            m
+        };
+        assert_eq!(response_code(&msg(0x8180)), Some(0));
+        assert_eq!(response_code(&msg(0x8183)), Some(3), "no such name");
+        assert_eq!(response_code(&msg(0x8182)), Some(2), "server failure");
+        assert_eq!(response_code(&msg(0x0100)), None, "a query has none");
+        assert_eq!(response_code(&[0x12]), None);
     }
 
     #[test]

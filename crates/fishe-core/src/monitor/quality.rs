@@ -193,6 +193,15 @@ impl FlowTracker {
         let Some((key, dir)) = self.key(info) else {
             return;
         };
+        if tcp.flags & TCP_SYN != 0 {
+            tally.note_syn(dir, tcp.flags & TCP_ACK != 0, key.remote, key.lport);
+        }
+        if tcp.payload_len > 0 {
+            let port = key.lport.min(key.rport);
+            if crate::security::services::audited_tcp_port(port) {
+                tally.note_payload(key.remote, port, u64::from(tcp.payload_len));
+            }
+        }
         self.sweep(ts);
         if !self.flows.contains_key(&key) && self.flows.len() >= MAX_FLOWS {
             return;
@@ -585,6 +594,153 @@ mod tests {
             .get(&IpAddr::from(THEM))
             .map(|e| e.quality.clone())
             .unwrap_or_default()
+    }
+
+    #[test]
+    fn connection_attempts_on_this_machine_are_noted() {
+        use crate::monitor::stats::InboundHit;
+        let mut f = tracker();
+        let mut t = Tally::default();
+        let them = IpAddr::from(THEM);
+        // They ask for local port 3389 twice (a retry), and we accept once.
+        let request = PacketInfo {
+            src_port: Some(61000),
+            dst_port: Some(3389),
+            ..pkt(false)
+        };
+        let reply = PacketInfo {
+            src_port: Some(3389),
+            dst_port: Some(61000),
+            ..pkt(true)
+        };
+        f.observe(1, &request, &seg(100, 0, TCP_SYN, 0), Some(true), &mut t);
+        f.observe(2, &request, &seg(100, 0, TCP_SYN, 0), Some(true), &mut t);
+        f.observe(
+            3,
+            &reply,
+            &seg(900, 101, TCP_SYN | TCP_ACK, 0),
+            Some(true),
+            &mut t,
+        );
+        // Port 8080 is asked for and never answered; counted whatever the
+        // session's scope makes of the packet.
+        let closed = PacketInfo {
+            dst_port: Some(8080),
+            ..request
+        };
+        f.observe(4, &closed, &seg(5, 0, TCP_SYN, 0), Some(false), &mut t);
+        // A connection we open is not an attempt on us, nor is its answer.
+        f.observe(5, &pkt(true), &seg(1, 0, TCP_SYN, 0), Some(true), &mut t);
+        f.observe(
+            6,
+            &pkt(false),
+            &seg(7, 2, TCP_SYN | TCP_ACK, 0),
+            Some(true),
+            &mut t,
+        );
+        // Ordinary data says nothing.
+        f.observe(7, &request, &seg(101, 901, TCP_ACK, 10), Some(true), &mut t);
+
+        assert_eq!(t.inbound.len(), 2);
+        assert_eq!(
+            t.inbound[&(them, 3389)],
+            InboundHit {
+                syns: 2,
+                answered: 1
+            }
+        );
+        assert_eq!(
+            t.inbound[&(them, 8080)],
+            InboundHit {
+                syns: 1,
+                answered: 0
+            }
+        );
+
+        // Batches add up, and a scan cannot grow one without bound.
+        let mut total = Tally::default();
+        total.merge(&t);
+        total.merge(&t);
+        assert_eq!(
+            total.inbound[&(them, 3389)],
+            InboundHit {
+                syns: 4,
+                answered: 2
+            }
+        );
+        for port in 0..=u16::MAX {
+            total.note_syn(Direction::In, false, them, port);
+        }
+        assert_eq!(total.inbound.len(), crate::monitor::stats::MAX_INBOUND);
+    }
+
+    #[test]
+    fn only_data_counts_as_using_an_unencrypted_service() {
+        let mut f = tracker();
+        let mut t = Tally::default();
+        let them = IpAddr::from(THEM);
+        let telnet = |out: bool| {
+            let p = pkt(out);
+            if out {
+                PacketInfo {
+                    dst_port: Some(23),
+                    ..p
+                }
+            } else {
+                PacketInfo {
+                    src_port: Some(23),
+                    ..p
+                }
+            }
+        };
+        // A connection to their Telnet port that is refused: no data, no use.
+        f.observe(1, &telnet(true), &seg(1, 0, TCP_SYN, 0), Some(true), &mut t);
+        f.observe(
+            2,
+            &telnet(false),
+            &seg(0, 2, TCP_RST | TCP_ACK, 0),
+            Some(true),
+            &mut t,
+        );
+        assert!(t.payload.is_empty());
+        // One that is accepted and carries data both ways.
+        f.observe(
+            3,
+            &telnet(true),
+            &seg(10, 0, TCP_SYN, 0),
+            Some(true),
+            &mut t,
+        );
+        f.observe(
+            4,
+            &telnet(false),
+            &seg(50, 11, TCP_SYN | TCP_ACK, 0),
+            Some(true),
+            &mut t,
+        );
+        f.observe(
+            5,
+            &telnet(true),
+            &seg(11, 51, TCP_ACK, 40),
+            Some(true),
+            &mut t,
+        );
+        f.observe(
+            6,
+            &telnet(false),
+            &seg(51, 51, TCP_ACK, 200),
+            Some(true),
+            &mut t,
+        );
+        assert_eq!(t.payload[&(them, 23)], 240);
+        // HTTPS is not an audited port.
+        f.observe(7, &pkt(true), &seg(1, 0, TCP_ACK, 500), Some(true), &mut t);
+        assert_eq!(t.payload.len(), 1);
+        // Batches add up.
+        let mut total = Tally::default();
+        total.merge(&t);
+        total.merge(&t);
+        assert_eq!(total.payload[&(them, 23)], 480);
     }
 
     #[test]

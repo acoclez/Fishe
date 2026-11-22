@@ -11,10 +11,17 @@
 //! - [`ports`] opens and closes a connection to a few well-known ports to
 //!   hint at what the device is.
 //!
+//! - [`dhcp`] broadcasts one DHCPDISCOVER and lists the servers that offer
+//!   an address (it never accepts one).
+//! - [`inventory`] remembers the devices between scans, so a scan can say
+//!   who is new and whether the gateway is the one seen before.
+//!
 //! Reverse-DNS names come from the OS resolver. See `docs/lan-mapping.md`.
 
 pub mod adapters;
 pub mod arp;
+pub mod dhcp;
+pub mod inventory;
 pub mod oui;
 pub mod ports;
 
@@ -52,6 +59,11 @@ pub struct Device {
     pub is_gateway: bool,
     /// This PC itself.
     pub is_self: bool,
+    /// Not seen in earlier scans of this network (never set on the first
+    /// scan of a network, when everything is new).
+    pub is_new: bool,
+    /// When a scan first saw this device (Unix ms).
+    pub first_seen: Option<i64>,
     pub ports: Vec<OpenPort>,
 }
 
@@ -70,6 +82,9 @@ pub struct Network {
     /// A network larger than a /22 was swept around this PC's own /24.
     pub narrowed: bool,
     pub devices: Vec<Device>,
+    /// The DHCP servers that answered on this network. More than one is
+    /// worth a look.
+    pub dhcp: Vec<dhcp::DhcpServer>,
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
@@ -103,8 +118,19 @@ pub fn scan(probe_ports: bool) -> AppResult<ScanResult> {
     for iface in &ifaces {
         let (hosts, narrowed) = adapters::sweep_hosts(iface);
         narrowed_any |= narrowed;
-        let found = arp::sweep(iface, &hosts)?;
-        networks.push(build_network(iface, found, narrowed, probe_ports));
+        // The DHCP question waits for answers while the sweep runs.
+        let (found, servers) = std::thread::scope(|s| {
+            let asking = s.spawn(|| dhcp::discover(iface));
+            let found = arp::sweep(iface, &hosts);
+            (found, asking.join().unwrap_or_else(|_| Ok(Vec::new())))
+        });
+        let mut network = build_network(iface, found?, narrowed, probe_ports);
+        // The scan is still good without it.
+        network.dhcp = servers.unwrap_or_else(|e| {
+            log::warn!("DHCP discovery on {} failed: {e}", iface.name);
+            Vec::new()
+        });
+        networks.push(network);
     }
 
     let note = narrowed_any.then(|| {
@@ -163,6 +189,8 @@ fn build_network(
                 randomized_mac: mac.is_some_and(|m| oui::is_randomized(&m)),
                 is_gateway: Some(ip) == iface.gateway,
                 is_self: false,
+                is_new: false,
+                first_seen: None,
                 ports: open
                     .get(&ip)
                     .map(|ps| {
@@ -187,6 +215,8 @@ fn build_network(
         randomized_mac: oui::is_randomized(&iface.mac),
         is_gateway: false,
         is_self: true,
+        is_new: false,
+        first_seen: None,
         ports: Vec::new(),
     });
 
@@ -202,6 +232,7 @@ fn build_network(
         wireless: iface.wireless,
         narrowed,
         devices,
+        dhcp: Vec::new(),
     }
 }
 

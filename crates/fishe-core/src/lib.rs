@@ -21,6 +21,7 @@
 //! | `archive`   | recordings: SQLite store, recorder, pcapng, exports          |
 //! | `route`     | traceroute and ping (Windows ICMP API), gateways, neighbours |
 //! | `lan`       | LAN map: adapter list, ARP sweep, MAC vendor, port probe     |
+//! | `security`  | the security view: session audit, report, findings           |
 //! | `geo`       | endpoint owner & country: DB-IP Lite (offline), ipinfo (opt-in) |
 //! | `mcp`       | the local MCP server for agents, and its stdio bridge        |
 //! | `error`     | `AppError`, serialised as `{ code, message }`                |
@@ -42,5 +43,6 @@ pub mod ops;
 pub mod paths;
 pub mod process;
 pub mod route;
+pub mod security;
 pub mod services;
 pub mod util;

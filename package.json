@@ -1,6 +1,6 @@
 {
   "name": "fishe",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Fishe: real-time traffic gauge for a remote host or a local process (Tauri 2 + Svelte 5)",
   "type": "module",
   "scripts": {

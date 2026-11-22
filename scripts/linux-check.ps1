@@ -12,7 +12,8 @@
   -Live also runs the live tests of the core as root in the container: they
   open its network interface, send a few UDP datagrams and one TCP
   connection to 1.1.1.1, ping and trace, sweep the container's network with
-  ARP and read the kernel's routing tables. The container only sees its own
+  ARP, read the kernel's routing tables, and run a whole all-traffic session
+  through to its security report. The container only sees its own
   traffic, never this PC's or the LAN's.
 
   -App checks the whole workspace instead, window included: the source is
@@ -79,7 +80,8 @@ if ($Live) {
     "route::icmp::tests::loopback_answers_directly",
     "route::ping::tests::loopback_ping_and_limits",
     "route::trace::tests::traces_loopback_in_one_hop",
-    "lan::arp::tests::live_sweep"
+    "lan::arp::tests::live_sweep",
+    "ops::tests::live_security_report"
   )
   foreach ($t in $names) {
     $steps += "timeout 120 cargo test -p fishe-core --locked -- --ignored --exact $t"

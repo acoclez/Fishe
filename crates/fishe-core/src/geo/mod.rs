@@ -100,6 +100,11 @@ impl Geo {
 
     /// Like [`Geo::owner`], but only what is known now: an online miss is
     /// not queued.
+    /// Is an owner database installed?
+    pub fn has_database(&self) -> bool {
+        self.dbs().is_some()
+    }
+
     pub fn known_owner(&self, ip: IpAddr) -> Option<Owner> {
         if !matches!(addr::classify(ip), AddrScope::Public) {
             return None;

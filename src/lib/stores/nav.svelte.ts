@@ -5,7 +5,7 @@
  */
 import { settings } from "./settings.svelte";
 
-export type Page = "live" | "connections" | "map" | "archive" | "settings";
+export type Page = "live" | "connections" | "map" | "security" | "archive" | "settings";
 
 export interface PageInfo {
   id: Page;
@@ -19,8 +19,9 @@ export const PAGES: PageInfo[] = [
   { id: "live", label: "Live", key: "1", hint: "Gauge, traffic chart, quality and the busiest programs or endpoints" },
   { id: "connections", label: "Connections", key: "2", hint: "Every program, endpoint and packet of the session" },
   { id: "map", label: "Map", key: "3", hint: "Where the traffic goes: routes, owners, countries" },
-  { id: "archive", label: "Archive", key: "4", hint: "Saved recordings" },
-  { id: "settings", label: "Settings", key: "5", hint: "Sensitivity, units, owners database, agents (MCP), diagnostics" },
+  { id: "security", label: "Security", key: "4", hint: "What deserves a look: unencrypted services, exposed ports, DNS, the local network" },
+  { id: "archive", label: "Archive", key: "5", hint: "Saved recordings" },
+  { id: "settings", label: "Settings", key: "6", hint: "Sensitivity, units, owners database, agents (MCP), diagnostics" },
 ];
 
 /** Sections of the settings page, for deep links (e.g. the Agents chip). */

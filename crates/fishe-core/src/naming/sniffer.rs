@@ -18,20 +18,30 @@
 //!   public: it can name a LAN device, never a site;
 //! - a TLS server name only from a connection this machine opened;
 //! - and every name has to read as a host name ([`super::is_host_name`]).
+//!
+//! In an all-traffic session the same packets also feed the security audit
+//! ([`AuditTap`]): which DNS servers were asked, how long they took and how
+//! they answered, the newest TLS version each program's hello offers, and
+//! the DHCP servers heard answering (the filter lets their replies through).
 
 use super::addr::{self, AddrScope};
 use super::book::NameBook;
 use super::dns;
 use super::tls::{Reassembler, Sni};
+use crate::monitor::programs::Label;
+use crate::monitor::stats::UNATTRIBUTED;
 use crate::net::capture::OpenCapture;
 use crate::net::parse::{self, Transport};
-use std::collections::{HashMap, HashSet};
+use crate::process::machine::MachineScope;
+use crate::security::audit::Audit;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-pub const FILTER: &str = "udp port 53 or udp src port 5353 or tcp dst port 443";
+pub const FILTER: &str = "udp port 53 or udp src port 5353 or tcp dst port 443 \
+     or (udp src port 67 and udp dst port 68)";
 pub const SNAPLEN: i32 = 4096;
 pub const BUFFER_BYTES: i32 = 2 * 1024 * 1024;
 
@@ -39,47 +49,109 @@ pub const BUFFER_BYTES: i32 = 2 * 1024 * 1024;
 const ASKED_TTL: Duration = Duration::from_secs(10);
 const ASKED_MAX: usize = 4096;
 
+/// A hello waits this long before its program is looked up: a new
+/// connection's port shows in the socket table at the next refresh.
+const HELLO_SETTLE: Duration = Duration::from_millis(400);
+const HELLOS_MAX: usize = 512;
+
+/// Where the sniffer reports what the security view needs.
+pub struct AuditTap {
+    pub audit: Arc<Audit>,
+    /// Who owns a local port: names the program behind a TLS hello.
+    pub machine: Arc<MachineScope>,
+    /// The interface this sniffer reads, as shown to the user.
+    pub interface: String,
+    /// It is a VPN tunnel: what is seen here is inside the tunnel.
+    pub tunnel: bool,
+}
+
+/// TLS hellos waiting for their program: (seen, local port, server, version).
+#[derive(Default)]
+struct Hellos(VecDeque<(Instant, u16, IpAddr, u16)>);
+
+impl Hellos {
+    fn seen(&mut self, now: Instant, port: u16, server: IpAddr, offered: u16) {
+        if self.0.len() < HELLOS_MAX {
+            self.0.push_back((now, port, server, offered));
+        }
+    }
+
+    /// Report the hellos that have waited long enough (`all`: every one).
+    fn settle(&mut self, tap: &AuditTap, now: Instant, all: bool) {
+        while let Some(&(seen, port, server, offered)) = self.0.front() {
+            if !all && now.saturating_duration_since(seen) < HELLO_SETTLE {
+                break;
+            }
+            self.0.pop_front();
+            let pid = tap
+                .machine
+                .ownership
+                .owner(Transport::Tcp, port)
+                .unwrap_or(UNATTRIBUTED);
+            tap.audit
+                .tls_hello(&Label::of(&tap.machine, pid), server, offered);
+        }
+    }
+}
+
 /// `(server, client, client port, transaction id)`.
 type QueryKey = (IpAddr, IpAddr, u16, u16);
 
-/// The DNS queries this machine sent in the last few seconds.
+/// The DNS queries this machine sent in the last few seconds: when each
+/// was read here (to forget it in time) and when the capture saw it (to
+/// time the answer: packets arrive in batches, so the moment they are read
+/// says little about the moment they passed).
 #[derive(Default)]
-struct Asked(HashMap<QueryKey, Instant>);
+struct Asked(HashMap<QueryKey, (Instant, u64)>);
 
 impl Asked {
-    fn sent(&mut self, key: QueryKey, now: Instant) {
+    /// A question left at capture time `ts_us` (µs).
+    fn sent(&mut self, key: QueryKey, now: Instant, ts_us: u64) {
         if self.0.len() >= ASKED_MAX {
             self.expire(now);
             if self.0.len() >= ASKED_MAX {
                 self.0.clear();
             }
         }
-        self.0.insert(key, now);
+        self.0.insert(key, (now, ts_us));
     }
 
-    /// Whether an answer with this key is one that was asked for.
-    fn expects(&self, key: &QueryKey, now: Instant) -> bool {
-        self.0
-            .get(key)
-            .is_some_and(|sent| now.saturating_duration_since(*sent) <= ASKED_TTL)
+    /// An answer with this key arrived at capture time `ts_us`: how long
+    /// it took, if it is one that was asked for. A question is answered
+    /// once; a second answer to it is nobody's.
+    fn answered(&mut self, key: &QueryKey, ts_us: u64) -> Option<Duration> {
+        let (_, sent_us) = self.0.remove(key)?;
+        let took = Duration::from_micros(ts_us.saturating_sub(sent_us));
+        (took <= ASKED_TTL).then_some(took)
     }
 
-    fn expire(&mut self, now: Instant) {
-        self.0
-            .retain(|_, sent| now.saturating_duration_since(*sent) <= ASKED_TTL);
+    /// Forget the questions nobody answered in time; returns their servers.
+    fn expire(&mut self, now: Instant) -> Vec<IpAddr> {
+        let mut unanswered = Vec::new();
+        self.0.retain(|key, (sent, _)| {
+            let waiting = now.saturating_duration_since(*sent) <= ASKED_TTL;
+            if !waiting {
+                unanswered.push(key.0);
+            }
+            waiting
+        });
+        unanswered
     }
 }
 
 /// Run until `stop` is set or the capture fails (naming is best-effort).
-/// `local` holds this machine's addresses on the captured interfaces.
+/// `local` holds this machine's addresses on the captured interfaces;
+/// `audit` is where an all-traffic session's security facts go.
 pub fn run(
     mut open: OpenCapture,
     book: Arc<NameBook>,
     local: Arc<HashSet<IpAddr>>,
+    audit: Option<AuditTap>,
     stop: Arc<AtomicBool>,
 ) {
     let mut tls = Reassembler::new();
     let mut asked = Asked::default();
+    let mut hellos = Hellos::default();
     let mut last_expire = Instant::now();
     let (mut dns_answers, mut dns_unasked, mut snis) = (0u64, 0u64, 0u64);
 
@@ -89,6 +161,7 @@ pub fn run(
                 let Some((info, l4)) = parse::parse_l4(open.link, p.data) else {
                     continue;
                 };
+                let ts_us = crate::monitor::engine::ts_us(p.header);
                 match info.transport {
                     // A query of ours: remember it, to recognise its answer.
                     Transport::Udp if info.dst_port == Some(53) => {
@@ -97,25 +170,60 @@ pub fn run(
                             info.src_port,
                             parse::udp_payload(l4).and_then(dns::query_id),
                         ) {
-                            asked.sent((info.dst, info.src, port, id), Instant::now());
+                            asked.sent((info.dst, info.src, port, id), Instant::now(), ts_us);
+                            // A resolver on this machine (127.0.0.53) asks
+                            // the real server itself: that one is counted.
+                            if let Some(tap) = &audit
+                                && !info.dst.is_loopback()
+                            {
+                                tap.audit.dns_query(info.dst);
+                                if !tap.tunnel {
+                                    tap.audit.dns_outside();
+                                }
+                            }
                         }
                     }
                     Transport::Udp if info.src_port == Some(53) => {
                         let Some(payload) = parse::udp_payload(l4) else {
                             continue;
                         };
-                        let expected = info.dst_port.zip(dns::response_id(payload)).is_some_and(
-                            |(port, id)| {
-                                asked.expects(&(info.src, info.dst, port, id), Instant::now())
-                            },
-                        );
-                        if !expected {
+                        let took =
+                            info.dst_port
+                                .zip(dns::response_id(payload))
+                                .and_then(|(port, id)| {
+                                    asked.answered(&(info.src, info.dst, port, id), ts_us)
+                                });
+                        let Some(took) = took else {
                             dns_unasked += 1;
                             continue;
+                        };
+                        if let Some(tap) = &audit
+                            && !info.src.is_loopback()
+                        {
+                            let code = dns::response_code(payload).unwrap_or(0);
+                            tap.audit.dns_answer(info.src, took, code);
                         }
                         for (ip, name) in dns::parse_response(payload) {
                             book.set_dns(ip, name);
                             dns_answers += 1;
+                        }
+                    }
+                    // A DHCP server answering somebody on this network.
+                    Transport::Udp if info.src_port == Some(67) => {
+                        if let Some(tap) = &audit
+                            && let Some(seen) = crate::lan::dhcp::seen(open.link, p.data)
+                            && matches!(
+                                seen.reply.kind,
+                                crate::lan::dhcp::OFFER | crate::lan::dhcp::ACK
+                            )
+                        {
+                            tap.audit.dhcp_reply(
+                                &tap.interface,
+                                seen.reply.server_id.unwrap_or(seen.from),
+                                seen.mac,
+                                seen.reply.router,
+                                &seen.reply.dns,
+                            );
                         }
                     }
                     Transport::Udp if info.src_port == Some(5353) => {
@@ -135,10 +243,14 @@ pub fn run(
                             continue;
                         };
                         let key = (info.src, sport, info.dst, 443);
-                        if let Some(Sni::Found { name, ech }) = tls.push(key, seg.seq, seg.payload)
-                        {
-                            book.set_sni(info.dst, name, ech);
-                            snis += 1;
+                        if let Some(hello) = tls.push_hello(key, seg.seq, seg.payload) {
+                            if let Sni::Found { name, ech } = hello.sni {
+                                book.set_sni(info.dst, name, ech);
+                                snis += 1;
+                            }
+                            if let (Some(_), Some(offered)) = (&audit, hello.offered) {
+                                hellos.seen(Instant::now(), sport, info.dst, offered);
+                            }
                         }
                     }
                     _ => {}
@@ -153,8 +265,17 @@ pub fn run(
         if last_expire.elapsed() > Duration::from_secs(1) {
             tls.expire();
             last_expire = Instant::now();
-            asked.expire(last_expire);
+            let unanswered = asked.expire(last_expire);
+            if let Some(tap) = &audit {
+                for server in unanswered.into_iter().filter(|s| !s.is_loopback()) {
+                    tap.audit.dns_unanswered(server, 1);
+                }
+                hellos.settle(tap, last_expire, false);
+            }
         }
+    }
+    if let Some(tap) = &audit {
+        hellos.settle(tap, Instant::now(), true);
     }
     log::info!(
         "naming on {}: {dns_answers} DNS answers ({dns_unasked} not asked for, ignored), {snis} TLS server names",
@@ -171,19 +292,80 @@ mod tests {
         let (server, client): (IpAddr, IpAddr) = ([9, 9, 9, 9].into(), [192, 168, 1, 20].into());
         let key = (server, client, 50_000, 0x1234);
         let t0 = Instant::now();
+        // Capture times, in µs: the question left at 5 s.
+        let sent_us = 5_000_000;
         let mut asked = Asked::default();
-        assert!(!asked.expects(&key, t0), "nothing was asked");
-        asked.sent(key, t0);
-        assert!(asked.expects(&key, t0 + Duration::from_secs(1)));
+        assert_eq!(asked.answered(&key, sent_us), None, "nothing was asked");
+        asked.sent(key, t0, sent_us);
         // Another server, port or id is somebody else's packet.
-        assert!(!asked.expects(&([8, 8, 8, 8].into(), client, 50_000, 0x1234), t0));
-        assert!(!asked.expects(&(server, client, 50_001, 0x1234), t0));
-        assert!(!asked.expects(&(server, client, 50_000, 0x1235), t0));
-        // Too late.
+        let other: IpAddr = [8, 8, 8, 8].into();
+        assert_eq!(
+            asked.answered(&(other, client, 50_000, 0x1234), sent_us),
+            None
+        );
+        assert_eq!(
+            asked.answered(&(server, client, 50_001, 0x1234), sent_us),
+            None
+        );
+        assert_eq!(
+            asked.answered(&(server, client, 50_000, 0x1235), sent_us),
+            None
+        );
+        // The answer: timed by the capture, however late both were read.
+        // A second one is not expected.
+        assert_eq!(
+            asked.answered(&key, sent_us + 30_000),
+            Some(Duration::from_millis(30))
+        );
+        assert_eq!(asked.answered(&key, sent_us + 30_000), None);
+        // An answer captured too long after its question is not believed.
+        asked.sent(key, t0, sent_us);
+        let late_us = sent_us + ASKED_TTL.as_micros() as u64 + 1;
+        assert_eq!(asked.answered(&key, late_us), None);
+        // Questions nobody answered are forgotten, and counted for their server.
+        asked.sent((other, client, 50_000, 0x1), t0, sent_us);
         let late = t0 + ASKED_TTL + Duration::from_secs(1);
-        assert!(!asked.expects(&key, late));
-        asked.expire(late);
-        assert!(asked.0.is_empty());
+        asked.sent(key, late, late_us);
+        assert_eq!(asked.expire(late), [other], "the fresh question stays");
+        assert_eq!(asked.0.len(), 1);
+    }
+
+    #[test]
+    fn hellos_wait_for_their_program() {
+        use crate::process::ownership::OwnershipTable;
+        let ownership = Arc::new(OwnershipTable::new());
+        let machine = Arc::new(MachineScope::new(
+            ownership.clone(),
+            Arc::new(HashSet::new()),
+        ));
+        let tap = AuditTap {
+            audit: Arc::new(Audit::new()),
+            machine: machine.clone(),
+            interface: "Ethernet".into(),
+            tunnel: false,
+        };
+        let server: IpAddr = [93, 184, 216, 34].into();
+        let t0 = Instant::now();
+        let mut hellos = Hellos::default();
+        hellos.seen(t0, 50_000, server, 0x0301);
+        hellos.seen(t0 + Duration::from_millis(300), 50_001, server, 0x0304);
+
+        // Too early: the socket table has not seen the connection yet.
+        hellos.settle(&tap, t0 + Duration::from_millis(100), false);
+        assert!(tap.audit.facts().programs.is_empty());
+
+        // The owner turns up, then the first hello is old enough.
+        ownership.note(Transport::Tcp, 50_000, 4242);
+        hellos.settle(&tap, t0 + HELLO_SETTLE, false);
+        let facts = tap.audit.facts();
+        let app = &facts.programs["pid:4242"];
+        assert_eq!(app.old_tls[&server], 0x0301);
+        assert_eq!(hellos.0.len(), 1);
+
+        // At the end of the session the rest goes out, owner known or not.
+        hellos.settle(&tap, t0, true);
+        assert!(hellos.0.is_empty());
+        assert_eq!(tap.audit.facts().programs[""].tls_hellos, 1);
     }
 
     /// A real lookup is still named: the query goes out, its answer is
@@ -209,7 +391,7 @@ mod tests {
             .filter_map(|d| capture::open_with(d, FILTER, SNAPLEN, BUFFER_BYTES).ok())
             .map(|open| {
                 let (b, l, s) = (book.clone(), local.clone(), stop.clone());
-                std::thread::spawn(move || run(open, b, l, s))
+                std::thread::spawn(move || run(open, b, l, None, s))
             })
             .collect();
         assert!(!threads.is_empty(), "no interface could be opened");
@@ -250,7 +432,7 @@ mod tests {
                 (i >> 16) as u16,
                 i as u16,
             );
-            asked.sent(key, t0);
+            asked.sent(key, t0, 0);
         }
         assert!(asked.0.len() <= ASKED_MAX);
     }

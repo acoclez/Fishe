@@ -9,6 +9,7 @@
 
 use crate::archive::ArchiveState;
 use crate::geo::Geo;
+use crate::lan::inventory::LanState;
 use crate::mcp::{Activity, McpState};
 use crate::monitor::MonitorState;
 use crate::paths::Paths;
@@ -46,6 +47,8 @@ pub struct Services {
     pub pings: PingBook,
     /// The MCP server for agents: settings, listener, activity log.
     pub mcp: McpState,
+    /// Devices seen on the local networks, remembered between scans.
+    pub lan: LanState,
     listener: Mutex<Option<NoticeFn>>,
 }
 
@@ -61,6 +64,7 @@ impl Services {
             traces: TraceBook::default(),
             pings: PingBook::default(),
             mcp: McpState::new(paths.mcp_config()),
+            lan: LanState::new(paths.lan_inventory()),
             listener: Mutex::new(None),
             paths,
         })

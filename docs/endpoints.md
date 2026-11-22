@@ -92,7 +92,7 @@ interface (`naming/sniffer.rs`):
 
 | Setting | Value |
 |---|---|
-| BPF filter | `udp port 53 or udp src port 5353 or tcp dst port 443` |
+| BPF filter | `udp port 53 or udp src port 5353 or tcp dst port 443 or (udp src port 67 and udp dst port 68)` (the last part is DHCP servers' answers, for the [security view](security.md#local-network), not for naming) |
 | Snap length | 4096 bytes |
 | Kernel buffer | 2 MiB |
 

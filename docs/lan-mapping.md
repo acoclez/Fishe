@@ -22,6 +22,17 @@ For every local IPv4 network that has a default gateway (`lan::adapters`):
    A /24 takes about 2 seconds. Networks larger than a /22 (1022 hosts) are
    swept around this PC's own /24 only, so a /16 does not take minutes; the
    result is flagged `narrowed`.
+   Meanwhile, one **DHCP question** (`lan::dhcp`): Fishe broadcasts a single
+   DHCPDISCOVER, as a device joining the network does, and lists the
+   servers that answer with an offer: their address, and the gateway and
+   DNS servers each hands out. It never sends the request that would
+   accept an offer, so no lease is taken and nothing changes on this PC.
+   It waits 4.5 seconds for the offers: a server that does not know this
+   PC yet may first check that the address it will offer is free.
+   The question carries this adapter's own hardware address, so the server
+   offers the address this PC already has instead of setting another
+   aside. The list is usually one entry, the router; a second one is worth
+   a look ([security.md](security.md#local-network)).
 2. **Vendor** (`lan::oui`). The first 24–36 bits of a MAC are a prefix the
    IEEE registers to a maker. Fishe ships the registry
    (`data/oui.tsv.gz`, ~50k prefixes) and matches the longest one. A
@@ -54,12 +65,20 @@ silent to the sweep.
 ## Scope and safety
 
 A scan only ever touches the local network segment this PC is already on
-(the subnet of an adapter with a gateway), and only with ARP, reverse DNS
-and short-lived TCP connections to well-known ports — the ordinary traffic
+(the subnet of an adapter with a gateway), and only with ARP, one DHCP
+question, reverse DNS and short-lived TCP connections to well-known ports — the ordinary traffic
 of being a device on that network. It sends nothing to the internet and
-changes nothing on the devices it finds. Nothing is stored: the last result is
-kept in memory until the next scan or until the app closes, so it is still
-there after a visit to another page.
+changes nothing on the devices it finds. The last result is kept in memory
+until the next scan or until the app closes, so it is still there after a
+visit to another page.
+
+**What is remembered.** Each scan is folded into an inventory of the
+devices seen on each network (`lan.json` in the data folder: hardware
+addresses, names, makers, first and last time seen). It lets the next scan
+mark the devices that were not there before (**New** in the list) and lets
+the Security page say when the gateway answers from another hardware
+address. The file never leaves the machine; **Forget devices** on the
+Security page deletes it. See [security.md](security.md#local-network).
 
 ## Where it lives
 

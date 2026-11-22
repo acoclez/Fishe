@@ -11,7 +11,62 @@ use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 const EXT_SERVER_NAME: u16 = 0x0000;
+const EXT_SUPPORTED_VERSIONS: u16 = 0x002B;
 const EXT_ENCRYPTED_CLIENT_HELLO: u16 = 0xFE0D;
+
+/// A complete ClientHello: the server it names and the newest TLS version
+/// it offers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hello {
+    pub sni: Sni,
+    /// `0x0303` = TLS 1.2, `0x0304` = TLS 1.3, … `None` if unreadable.
+    pub offered: Option<u16>,
+}
+
+/// The newest TLS version a complete ClientHello record offers: the
+/// highest entry of its `supported_versions` extension (TLS 1.3 clients
+/// list their versions there), else the version field of the hello itself.
+pub fn client_hello_offered(data: &[u8]) -> Option<u16> {
+    if data.len() < 6 || data[0] != 0x16 || data[5] != 0x01 {
+        return None;
+    }
+    let record_len = usize::from(u16::from_be_bytes([data[3], data[4]]));
+    let hs = data.get(5..5 + record_len)?;
+    let legacy = u16::from_be_bytes([*hs.get(4)?, *hs.get(5)?]);
+    // Past the fixed part, to the extensions (as in `parse_hello`).
+    let mut p = 4 + 2 + 32;
+    p += 1 + usize::from(*hs.get(p)?);
+    p += 2 + usize::from(u16::from_be_bytes([*hs.get(p)?, *hs.get(p + 1)?]));
+    p += 1 + usize::from(*hs.get(p)?);
+    let Some(ext_total) = hs
+        .get(p..p + 2)
+        .map(|b| usize::from(u16::from_be_bytes([b[0], b[1]])))
+    else {
+        return Some(legacy); // a hello without extensions (very old client)
+    };
+    p += 2;
+    let ext_end = (p + ext_total).min(hs.len());
+    while p + 4 <= ext_end {
+        let ty = u16::from_be_bytes([hs[p], hs[p + 1]]);
+        let len = usize::from(u16::from_be_bytes([hs[p + 2], hs[p + 3]]));
+        let body = hs.get(p + 4..p + 4 + len)?;
+        if ty == EXT_SUPPORTED_VERSIONS {
+            // length(1), then 2-byte versions. GREASE values (0x?A?A) are
+            // placeholders, not versions.
+            let newest = body
+                .get(1..)?
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|v| u16::from_be_bytes(*v))
+                .filter(|v| v & 0x0F0F != 0x0A0A)
+                .max();
+            return Some(newest.unwrap_or(legacy));
+        }
+        p += 4 + len;
+    }
+    Some(legacy)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Sni {
@@ -129,6 +184,11 @@ impl Reassembler {
 
     /// Feed one client→server segment. Returns the server name once known.
     pub fn push(&mut self, key: FlowKey, seq: u32, payload: &[u8]) -> Option<Sni> {
+        self.push_hello(key, seq, payload).map(|h| h.sni)
+    }
+
+    /// As [`Self::push`], with the TLS version the hello offers.
+    pub fn push_hello(&mut self, key: FlowKey, seq: u32, payload: &[u8]) -> Option<Hello> {
         if payload.is_empty() {
             return None;
         }
@@ -168,9 +228,12 @@ impl Reassembler {
                 self.flows.remove(&key);
                 None
             }
-            done => {
+            sni => {
                 self.flows.remove(&key);
-                Some(done)
+                Some(Hello {
+                    sni,
+                    offered: client_hello_offered(&buf),
+                })
             }
         }
     }
@@ -279,6 +342,88 @@ pub(crate) mod tests {
             })
         );
         assert!(r.flows.is_empty());
+    }
+
+    /// A minimal ClientHello record with this version field and, when
+    /// given, a `supported_versions` extension.
+    fn hello_versions(legacy: u16, versions: Option<&[u16]>, extensions: bool) -> Vec<u8> {
+        let mut body = legacy.to_be_bytes().to_vec();
+        body.extend([7u8; 32]); // random
+        body.push(0); // no session id
+        body.extend_from_slice(&2u16.to_be_bytes());
+        body.extend_from_slice(&[0x13, 0x01]); // one cipher suite
+        body.extend_from_slice(&[1, 0]); // compression: null
+        if extensions {
+            let mut ext = Vec::new();
+            if let Some(versions) = versions {
+                let list: Vec<u8> = versions.iter().flat_map(|v| v.to_be_bytes()).collect();
+                ext.extend_from_slice(&EXT_SUPPORTED_VERSIONS.to_be_bytes());
+                ext.extend_from_slice(&(list.len() as u16 + 1).to_be_bytes());
+                ext.push(list.len() as u8);
+                ext.extend(list);
+            }
+            // Something after it, to walk past.
+            ext.extend_from_slice(&[0x00, 0x17, 0, 0]);
+            body.extend_from_slice(&(ext.len() as u16).to_be_bytes());
+            body.extend(ext);
+        }
+        let mut hs = vec![0x01, 0, 0, 0];
+        hs[1..4].copy_from_slice(&(body.len() as u32).to_be_bytes()[1..]);
+        hs.extend(body);
+        let mut rec = vec![0x16, 0x03, 0x01];
+        rec.extend_from_slice(&(hs.len() as u16).to_be_bytes());
+        rec.extend(hs);
+        rec
+    }
+
+    #[test]
+    fn the_newest_offered_version_is_read() {
+        // A current client: version field frozen at 1.2, the real list in
+        // the extension, with a GREASE placeholder first.
+        let modern = hello_versions(0x0303, Some(&[0x7A7A, 0x0304, 0x0303]), true);
+        assert_eq!(client_hello_offered(&modern), Some(0x0304));
+        // TLS 1.2 at most: no extension, the field says it.
+        assert_eq!(
+            client_hello_offered(&hello_versions(0x0303, None, true)),
+            Some(0x0303)
+        );
+        // Old clients.
+        assert_eq!(
+            client_hello_offered(&hello_versions(0x0301, None, true)),
+            Some(0x0301)
+        );
+        assert_eq!(
+            client_hello_offered(&hello_versions(0x0302, None, false)),
+            Some(0x0302)
+        );
+        // Only placeholders listed: fall back to the field.
+        assert_eq!(
+            client_hello_offered(&hello_versions(0x0303, Some(&[0x0A0A]), true)),
+            Some(0x0303)
+        );
+        // The hello the other tests use names a host and offers 1.2.
+        let named = hello("example.org", 0, false);
+        assert_eq!(client_hello_offered(&named), Some(0x0303));
+        // Not a hello, or cut short.
+        assert_eq!(client_hello_offered(b"\x17\x03\x03\x00\x10payload"), None);
+        assert_eq!(client_hello_offered(&modern[..20]), None);
+        assert_eq!(client_hello_offered(&[]), None);
+
+        // The reassembler hands both out.
+        let key: FlowKey = (
+            "10.0.0.2".parse().unwrap(),
+            50002,
+            "1.2.3.4".parse().unwrap(),
+            443,
+        );
+        let mut r = Reassembler::new();
+        assert_eq!(
+            r.push_hello(key, 1, &modern),
+            Some(Hello {
+                sni: Sni::NoName,
+                offered: Some(0x0304)
+            })
+        );
     }
 
     #[test]

@@ -118,6 +118,13 @@
       {net.interface}
       <span class="muted">· {net.ip}/{net.prefix}{net.wireless ? " · Wi-Fi" : ""}</span>
       {#if net.description && net.description !== net.interface}<span class="muted small">· {net.description}</span>{/if}
+      {#if net.dhcp.length === 1}
+        <span class="muted small" title="The DHCP server that answered: it hands out gateway {net.dhcp[0].router ?? '–'} and DNS {net.dhcp[0].dns.join(' ') || '–'}">· DHCP {net.dhcp[0].ip}</span>
+      {:else if net.dhcp.length > 1}
+        <span class="badge new" title={net.dhcp.map((d) => `${d.ip}${d.mac ? " (" + d.mac + ")" : ""}: gateway ${d.router ?? "–"}, DNS ${d.dns.join(" ") || "–"}`).join("\n")}>
+          {net.dhcp.length} DHCP servers
+        </span>
+      {/if}
     </h3>
 
     {#if view === "list"}
@@ -141,6 +148,7 @@
                   <span class="who" title={label(d)}>{label(d)}</span>
                   {#if d.isGateway && d.hostname}<span class="badge">Gateway</span>{/if}
                   {#if d.isSelf && d.hostname}<span class="badge self">This PC</span>{/if}
+                  {#if d.isNew}<span class="badge new" title="Not there at the previous scan of this network">New</span>{/if}
                 </div>
               </td>
               <td class="mono">{d.ip}</td>
@@ -434,6 +442,10 @@
   .badge.self {
     border-color: var(--accent);
     color: var(--accent);
+  }
+  .badge.new {
+    border-color: var(--level-busy);
+    color: var(--level-busy);
   }
   .mono {
     font-family: var(--mono, ui-monospace, monospace);

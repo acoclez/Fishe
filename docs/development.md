@@ -219,9 +219,35 @@ powershell -File scripts/linux-check.ps1 -App -Package     # plus the .deb and .
 | Switch | Image | What runs |
 |---|---|---|
 | none | `scripts/linux/Dockerfile`: Debian, Rust, libpcap | rustfmt, clippy and the unit tests of `fishe-core` |
-| `-Live` | the same | also, as root in the container: capture, TCP quality and attribution against 1.1.1.1; ICMP probe, ping and traceroute on loopback; an ARP sweep of the container's network |
+| `-Live` | the same | also, as root in the container: capture, TCP quality and attribution against 1.1.1.1; ICMP probe, ping and traceroute on loopback; an ARP sweep of the container's network; a whole all-traffic session through to its security report |
 | `-App` | `scripts/linux/app.Dockerfile`: adds WebKitGTK, Node.js and a virtual display (about 2.5 GB) | `npm ci`, the Svelte check, the frontend tests, clippy and the tests of both crates, `tauri build --debug --no-bundle` |
 | `-App -Package` | the same | also the `.deb` and `.rpm` from that build, and `apt install` of the `.deb` |
+
+The security report's inbound side needs a second machine. Two containers
+on one Docker network do: one runs the live test with a fixed port and a
+longer session, the other tries its ports meanwhile.
+
+```sh
+docker network create fishe-test
+docker run -d --rm --name fishe-b --network fishe-test fishe-linux-dev bash -c   'while true; do for p in $(seq 20 45) 8099; do timeout 0.3 bash -c "</dev/tcp/fishe-a/$p"; done; sleep 1; done'
+docker run --rm --name fishe-a --network fishe-test -e FISHE_LIVE_SECS=12 -e FISHE_LIVE_PORT=8099   -v "<repo>:/src:ro" -v fishe-cargo:/usr/local/cargo/registry -v fishe-target:/target fishe-linux-dev   cargo test -p fishe-core --locked --lib -- --ignored --exact ops::tests::live_security_report --nocapture
+docker rm -f fishe-b; docker network rm fishe-test
+```
+
+The same network serves two more checks of the security view.
+
+- **Two DHCP servers.** Start two containers that each run `dnsmasq`
+  (`apt-get install dnsmasq-base`, `--cap-add NET_ADMIN`) with their own
+  `--dhcp-range` and themselves as `--dhcp-option=3` (gateway) and `6`
+  (DNS). In a third, `lan::dhcp::tests::live_discover` lists both, and
+  the live security test with `FISHE_LIVE_DHCP=1` hears both.
+- **A tunnel.** In a container started with `--cap-add NET_ADMIN`:
+  `ip link add tun0 type dummy`, give it an address, bring it up,
+  `ip route add 9.9.9.9 via <gateway> dev eth0` (and the same for
+  8.8.8.8), then `ip route replace default dev tun0`. The live security
+  test with `FISHE_LIVE_OUTSIDE=9.9.9.9` reports IPv4 as routed through
+  `tun0`, the bytes on each side, and what left outside it. An interface
+  named like a tunnel is enough: the name is what Fishe recognises.
 
 The repository is mounted read-only. The Linux build, the crate registry
 and (for `-App`) a copy of the source with its own `node_modules` live in

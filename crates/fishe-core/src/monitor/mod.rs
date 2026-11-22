@@ -29,6 +29,8 @@ use crate::process::{
     elevation, etw, machine::MachineScope, ownership::OwnershipTable, processes, refresh,
     scope::ProcessScope,
 };
+use crate::security::SessionState;
+use crate::security::audit::{Audit, Facts};
 use events::{EventSink, MonitorEvent};
 use gauge::{GaugeConfig, GaugeOverrides};
 use packets::{PacketBatch, PacketRing, PacketRow};
@@ -196,6 +198,8 @@ struct Running {
     machine: Option<Arc<MachineScope>>,
     /// Latest sample and recent history, for readers other than the UI (MCP).
     live: Arc<live::Live>,
+    /// The security view's facts (all-traffic mode).
+    audit: Option<Arc<Audit>>,
 }
 
 /// A temporary claim on the packet feed (see [`MonitorState::hold_packet_feed`]).
@@ -304,6 +308,19 @@ impl MonitorState {
         let packets = Arc::new(PacketRing::default());
         let live = Arc::new(live::Live::default());
         let machine = prepared.machine.as_ref().map(|m| m.scope.clone());
+        // Only an all-traffic session sees the whole machine.
+        let audit = machine.is_some().then(|| {
+            // Which capture worker reads a VPN tunnel, in worker order.
+            let tunnels = prepared
+                .captures
+                .iter()
+                .map(|c| {
+                    crate::security::vpn::tunnel_kind(&c.device_name, &c.device_description)
+                        .is_some()
+                })
+                .collect();
+            Arc::new(Audit::with_tunnels(tunnels))
+        });
 
         let stop = Arc::new(AtomicBool::new(false));
         let plan = engine::SessionPlan {
@@ -317,6 +334,7 @@ impl MonitorState {
             live: live.clone(),
             recording: recording.clone(),
             geo: geo.clone(),
+            audit: audit.clone(),
             captures: prepared.captures,
             gauge,
             tick: Duration::from_millis(tick_ms),
@@ -343,6 +361,7 @@ impl MonitorState {
             packets,
             machine,
             live,
+            audit,
         });
         if let Some(prev) = previous {
             // Another start raced us between `stop()` above and here (a double
@@ -432,6 +451,18 @@ impl MonitorState {
                 true
             }
             None => false,
+        }
+    }
+
+    /// What the security view takes from the session: whether it sees
+    /// the whole machine, the facts gathered so far and the names learnt.
+    pub fn security(&self) -> (SessionState, Option<Facts>, Option<Arc<NameBook>>) {
+        match self.lock().as_ref() {
+            None => (SessionState::NoSession, None, None),
+            Some(r) => match &r.audit {
+                Some(audit) => (SessionState::Auditing, Some(audit.facts()), r.names.clone()),
+                None => (SessionState::NotAllTraffic, None, None),
+            },
         }
     }
 
